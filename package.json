@@ -1,0 +1,25 @@
+{
+  "name": "clarity-todo-app",
+  "version": "1.0.0",
+  "description": "A modern todo list app with folders and task management",
+  "main": "index.html",
+  "scripts": {
+    "build": "node build.js",
+    "start": "npm run build && npx http-server -p 3000 -o",
+    "dev": "npm run build && npx http-server -p 3000 -o",
+    "setup": "node setup.js"
+  },
+  "keywords": [
+    "todo",
+    "task-management",
+    "productivity"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "dependencies": {
+    "@instantdb/core": "^0.21.26"
+  }
+}

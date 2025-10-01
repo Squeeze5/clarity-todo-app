@@ -15,7 +15,6 @@ node_modules/
 
 # Build outputs
 dist/
-build/
 
 # Logs
 *.log
@@ -32,11 +31,5 @@ temp/
 Thumbs.db
 Desktop.ini
 
-#database
+# Generated library folder
 lib/
-instant.perms.ts
-instant.schema.ts
-package.json
-build.js
-package-lock.json
-script-instantdb.js
