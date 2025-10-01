@@ -7,7 +7,8 @@ window.confirm = function(message) {
 };
 
 // InstantDB Configuration
-// App ID is loaded from environment variables
+// This is the PUBLIC app ID - it's safe to expose as authentication and permissions protect the data
+// The SECRET admin token is never included in client code
 const APP_ID = '79b71357-9dae-4fa3-8ee4-ab8a43ffefc0';
 
 // Global database instance
