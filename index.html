@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clarity Todo App</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="lib/instantdb.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="header-top">
+                <h1><i class="fas fa-check-circle"></i> Clarity Todo</h1>
+                <div class="header-actions">
+                    <div class="search-container">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="global-search-input" placeholder="Search tasks..." maxlength="100">
+                        <button class="btn btn-secondary btn-sm" id="global-clear-search-btn" style="display: none;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <button class="btn btn-primary" id="add-folder-btn">
+                        <i class="fas fa-folder-plus"></i> New Folder
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <div class="folder-section">
+                    <h3>Folders</h3>
+                    <div class="folder-list" id="folder-list">
+                        <div class="folder-item active" data-folder-id="default">
+                            <i class="fas fa-inbox"></i>
+                            <span>Inbox</span>
+                            <span class="task-count">0</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="task-area">
+                <div class="task-header">
+                    <h2 id="current-folder-title">Inbox</h2>
+                    <button class="btn btn-primary" id="add-task-btn">
+                        <i class="fas fa-plus"></i> Add Task
+                    </button>
+                </div>
+
+                <div class="task-input-container" id="task-input-container" style="display: none;">
+                    <input type="text" id="task-input" placeholder="Enter your task..." maxlength="200">
+                    <div class="task-input-actions">
+                        <button class="btn btn-success" id="save-task-btn">
+                            <i class="fas fa-check"></i> Save
+                        </button>
+                        <button class="btn btn-secondary" id="cancel-task-btn">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                    </div>
+                </div>
+
+                <div class="task-list" id="task-list">
+                    <div class="empty-state">
+                        <i class="fas fa-clipboard-list"></i>
+                        <h3>No tasks yet</h3>
+                        <p>Click "Add Task" to create your first task</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Folder Modal -->
+    <div class="modal" id="folder-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="folder-modal-title">New Folder</h3>
+                <button class="modal-close" id="folder-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="folder-name-input" placeholder="Folder name..." maxlength="50">
+                <div class="color-picker">
+                    <label>Choose color:</label>
+                    <div class="color-options">
+                        <div class="color-option" data-color="#3b82f6" style="background-color: #3b82f6;"></div>
+                        <div class="color-option" data-color="#10b981" style="background-color: #10b981;"></div>
+                        <div class="color-option" data-color="#f59e0b" style="background-color: #f59e0b;"></div>
+                        <div class="color-option" data-color="#ef4444" style="background-color: #ef4444;"></div>
+                        <div class="color-option" data-color="#8b5cf6" style="background-color: #8b5cf6;"></div>
+                        <div class="color-option" data-color="#06b6d4" style="background-color: #06b6d4;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="save-folder-btn">Save</button>
+                <button class="btn btn-secondary" id="cancel-folder-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Edit Modal -->
+    <div class="modal" id="task-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Task</h3>
+                <button class="modal-close" id="task-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="edit-task-input" placeholder="Task description..." maxlength="200">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="save-edit-task-btn">Save</button>
+                <button class="btn btn-secondary" id="cancel-edit-task-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Authentication Modal -->
+    <div class="modal active" id="auth-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="auth-modal-title">Sign In to Clarity Todo</h3>
+            </div>
+            <div class="modal-body">
+                <div id="auth-form">
+                    <input type="email" id="auth-email" placeholder="Email address..." autocomplete="email">
+                    <input type="password" id="auth-password" placeholder="Password..." autocomplete="current-password">
+                    <div id="auth-confirm-password-container" style="display: none;">
+                        <input type="password" id="auth-confirm-password" placeholder="Confirm password..." autocomplete="new-password">
+                    </div>
+                    <div id="auth-error" class="auth-error" style="display: none;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="auth-submit-btn">Sign In</button>
+                <button class="btn btn-secondary" id="auth-toggle-btn">Don't have an account? Sign Up</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal" id="confirmation-modal">
+        <div class="modal-content confirmation-modal-content">
+            <div class="modal-header">
+                <h3 id="confirmation-title">Confirm Action</h3>
+            </div>
+            <div class="modal-body">
+                <p id="confirmation-message">Are you sure you want to perform this action?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="confirm-yes-btn">Yes</button>
+                <button class="btn btn-secondary" id="confirm-no-btn">No</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script-instantdb.js"></script>
+</body>
+</html>

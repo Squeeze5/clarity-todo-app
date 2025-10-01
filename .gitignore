@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+tmp/
+temp/
+
+# Claude workspace
+.claude/
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+
+#database
+lib/
+instant.perms.ts
+instant.schema.ts
+package.json
+build.js
+package-lock.json
+script-instantdb.js
