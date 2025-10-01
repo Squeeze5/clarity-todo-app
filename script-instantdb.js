@@ -37,6 +37,20 @@ function getCurrentUser() {
     return null;
 }
 
+// Helper function to wait for user authentication
+async function waitForAuth(maxWaitTime = 3000) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < maxWaitTime) {
+        const user = getCurrentUser();
+        if (user && user.id) {
+            return user;
+        }
+        // Check every 100ms
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return null;
+}
+
 class AuthManager {
     constructor() {
         this.user = null;
@@ -202,6 +216,12 @@ class AuthManager {
             const authResult = await db.auth.signInWithMagicCode({ email: email, code: code });
             console.log('Auth result received:', authResult);
             
+            // Store the refresh token if available for session persistence
+            if (authResult && authResult.refreshToken) {
+                localStorage.setItem('instantdb-refresh-token', authResult.refreshToken);
+                console.log('Refresh token stored for session persistence');
+            }
+            
             // After sign in, wait a moment for the user to be set in the reactor
             await new Promise(resolve => setTimeout(resolve, 100));
             
@@ -313,20 +333,61 @@ class AuthManager {
         }
         
         try {
-            // For now, we'll skip session persistence
-            // InstantDB handles sessions differently
-            // You would need to implement token storage/retrieval
-            console.log('Session check - no persisted session');
+            console.log('Checking for existing session...');
+            
+            // InstantDB automatically persists sessions
+            // We just need to wait for it to restore from localStorage/cookies
+            const user = await waitForAuth(2000); // Wait up to 2 seconds
+            
+            if (user && user.id) {
+                console.log('Session restored! User:', user);
+                this.user = user;
+                this.hideAuthModal();
+                
+                // Initialize the todo app with restored user
+                window.todoApp = new TodoApp(this.user);
+                return true;
+            }
+            
+            // Try alternative approach: check for refresh token
+            const refreshToken = localStorage.getItem('instantdb-refresh-token');
+            if (refreshToken) {
+                console.log('Found refresh token, attempting manual restore...');
+                try {
+                    const authResult = await db.auth.signInWithToken({ refreshToken: refreshToken });
+                    if (authResult) {
+                        // Wait for auth to complete
+                        const restoredUser = await waitForAuth(1000);
+                        if (restoredUser && restoredUser.id) {
+                            console.log('Session restored via token! User:', restoredUser);
+                            this.user = restoredUser;
+                            this.hideAuthModal();
+                            window.todoApp = new TodoApp(this.user);
+                            return true;
+                        }
+                    }
+                } catch (tokenError) {
+                    console.log('Token expired or invalid, removing...');
+                    localStorage.removeItem('instantdb-refresh-token');
+                }
+            }
+            
+            console.log('No existing session found');
             return false;
         } catch (error) {
             console.error('Error checking session:', error);
+            return false;
         }
-        return false;
     }
 
     async signOut() {
         await db.auth.signOut();
         this.user = null;
+        
+        // Clear stored tokens
+        localStorage.removeItem('instantdb-refresh-token');
+        localStorage.removeItem('instantdb-auth');
+        
         // Reload page to reset everything
         window.location.reload();
     }
