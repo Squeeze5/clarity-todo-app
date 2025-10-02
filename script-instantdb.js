@@ -732,15 +732,35 @@ class TodoApp {
             // Find default folder
             const defaultFolder = this.folders.find(f => f.isDefault);
             
-            // Move all tasks to default folder
+            // Move all tasks to default folder by recreating them
             const folderTasks = this.tasks.filter(t => t.folder_id === folderId);
-            const moveTasks = folderTasks.map(task => 
-                db.tx.todos[task.id].link({ folder: defaultFolder.id })
-            );
+            
+            // Create operations to delete old tasks and recreate in default folder
+            const operations = [];
+            
+            // Reference the default folder entity first
+            if (defaultFolder && folderTasks.length > 0) {
+                operations.push(db.tx.folders[defaultFolder.id].update({}));
+            }
+            
+            folderTasks.forEach(task => {
+                const newTaskId = window.crypto.randomUUID();
+                // Delete old task
+                operations.push(db.tx.todos[task.id].delete());
+                // Create new task in default folder
+                operations.push(
+                    db.tx.todos[newTaskId].update({
+                        text: task.text,
+                        done: task.done,
+                        createdAt: task.createdAt,
+                        userId: this.userId
+                    }).link({ folder: defaultFolder.id })
+                );
+            });
             
             // Delete the folder and move tasks in one transaction
             await db.transact([
-                ...moveTasks,
+                ...operations,
                 db.tx.folders[folderId].delete()
             ]);
 
@@ -795,6 +815,7 @@ class TodoApp {
         try {
             const todoId = window.crypto.randomUUID();
             await db.transact([
+                db.tx.folders[this.currentFolderId].update({}),  // Reference the folder entity
                 db.tx.todos[todoId].update({
                     text: text,
                     done: false,
@@ -925,14 +946,28 @@ class TodoApp {
         e.preventDefault();
         e.currentTarget.classList.remove('drag-over');
 
-        if (!this.draggedTaskId || folderId === this.currentFolderId) {
+        console.log('handleDrop called with folderId:', folderId, 'type:', typeof folderId);
+        console.log('Current draggedTaskId:', this.draggedTaskId);
+        console.log('Current folderId:', this.currentFolderId);
+
+        // Capture the dragged task ID immediately before it gets cleared
+        const draggedTaskId = this.draggedTaskId;
+        
+        if (!draggedTaskId || !folderId || folderId === this.currentFolderId) {
+            console.log('Early return - missing draggedTaskId or folderId, or same folder');
             return;
         }
 
-        const task = this.tasks.find(t => t.id === this.draggedTaskId);
+        const task = this.tasks.find(t => t.id === draggedTaskId);
         const targetFolder = this.folders.find(f => f.id === folderId);
 
-        if (!task || !targetFolder) return;
+        console.log('Found task:', task);
+        console.log('Found target folder:', targetFolder);
+
+        if (!task || !targetFolder || !targetFolder.id) {
+            console.error('Missing task or target folder', { task, targetFolder });
+            return;
+        }
 
         const confirmed = await this.showConfirmation(
             'Move Task',
@@ -942,11 +977,57 @@ class TodoApp {
         if (!confirmed) return;
 
         try {
-            await db.transact([
-                db.tx.todos[this.draggedTaskId].link({ folder: folderId })
-            ]);
+            console.log('Attempting to move task');
+            console.log('Task ID:', draggedTaskId);  // Use captured value
+            console.log('Target Folder ID:', targetFolder.id);
+            console.log('Folder ID type:', typeof targetFolder.id);
+            
+            // Ensure we have valid UUIDs
+            if (!targetFolder.id || typeof targetFolder.id !== 'string') {
+                throw new Error(`Invalid folder ID: ${targetFolder.id}`);
+            }
+            
+            if (!draggedTaskId || typeof draggedTaskId !== 'string') {
+                throw new Error(`Invalid task ID: ${draggedTaskId}`);
+            }
+            
+            // In InstantDB, we need to delete the task and recreate it with the new folder link
+            const taskData = {
+                text: task.text || '',
+                done: task.done === true,
+                createdAt: task.createdAt || Date.now(),
+                userId: this.userId
+            };
+            
+            // Create new task ID
+            const newTaskId = window.crypto.randomUUID();
+            
+            console.log('New task ID:', newTaskId);
+            console.log('Task data:', taskData);
+            
+            // First attempt: Just like saveTask which works
+            const operations = [
+                db.tx.todos[draggedTaskId].delete(),  // Use captured value
+                db.tx.folders[targetFolder.id].update({}),  // Reference the folder
+                db.tx.todos[newTaskId]
+                    .update(taskData)
+                    .link({ folder: targetFolder.id })
+            ];
+            
+            console.log('Executing transaction...');
+            await db.transact(operations);
+            
+            console.log(`Task successfully moved from folder ${task.folder_id} to ${targetFolder.id}`);
+            
         } catch (error) {
             console.error('Error moving task:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                folderId: folderId,
+                targetFolderId: targetFolder?.id,
+                draggedTaskId: draggedTaskId  // Log the captured value
+            });
         }
     }
 
