@@ -12,6 +12,7 @@ node_modules/
 *.swo
 *~
 .DS_Store
+.mcp.json
 
 # Build outputs
 dist/
