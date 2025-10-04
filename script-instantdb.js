@@ -590,30 +590,60 @@ class TodoApp {
     }
     
     async sendEmailReminder(task) {
-        // For email reminders, we'll use EmailJS (free service)
-        // First, the user needs to sign up at https://www.emailjs.com/
-        // For now, we'll just log it
-        console.log('Email reminder would be sent for task:', task.text);
-        console.log('To enable email reminders, integrate with EmailJS or another email service');
-        
-        // If you want to implement EmailJS:
-        // 1. Sign up at https://www.emailjs.com/
-        // 2. Create an email service and template
-        // 3. Include EmailJS SDK: <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-        // 4. Use the following code:
-        /*
         try {
-            await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', {
-                to_email: this.userEmail,
-                task_name: task.text,
-                due_date: new Date(task.dueDate).toLocaleString(),
-                message: `Your task "${task.text}" is coming up soon!`
+            console.log('Sending email reminder for task:', task.text);
+            
+            // The function URL will work automatically:
+            // - On production (clarity-todo.netlify.app): uses your site URL
+            // - On localhost: you'll need Netlify CLI (netlify dev) running on port 8888
+            const functionUrl = '/.netlify/functions/send-reminder';
+            
+            const response = await fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    to_email: this.userEmail || this.user?.email || 'user@example.com',
+                    task_name: task.text,
+                    due_date: task.dueDate,
+                    due_time: task.dueTime || null,
+                    reminder_timing: task.reminderTiming || '1hour'
+                })
             });
-            console.log('Email sent successfully');
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to send email');
+            }
+            
+            console.log('Email reminder sent successfully:', data);
+            
+            // Show a success notification to the user
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Email Reminder Sent', {
+                    body: `Reminder email sent for "${task.text}"`,
+                    icon: '/favicon.ico',
+                    tag: `email-sent-${task.id}`
+                });
+            }
+            
         } catch (error) {
-            console.error('Failed to send email:', error);
+            console.error('Failed to send email reminder:', error);
+            
+            // Fallback: Try to send a browser notification instead
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Email Reminder Failed', {
+                    body: `Could not send email for "${task.text}". Will try browser notification instead.`,
+                    icon: '/favicon.ico',
+                    tag: `email-failed-${task.id}`
+                });
+                
+                // Send browser notification as fallback
+                await this.sendNotificationReminder(task);
+            }
         }
-        */
     }
     
     handleDateChange(e, context) {
