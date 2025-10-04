@@ -52,6 +52,40 @@
 
                 <div class="task-input-container" id="task-input-container" style="display: none;">
                     <input type="text" id="task-input" placeholder="Enter your task..." maxlength="200">
+                    <div class="task-datetime-container">
+                        <div class="datetime-row">
+                            <div class="date-field">
+                                <label for="task-due-date">Due Date:</label>
+                                <input type="date" id="task-due-date">
+                            </div>
+                            <div class="time-field">
+                                <label for="task-due-time">Time:</label>
+                                <input type="time" id="task-due-time">
+                            </div>
+                        </div>
+                        <div class="reminder-settings" id="reminder-settings" style="display: none;">
+                            <div class="reminder-row">
+                                <div class="reminder-type-field">
+                                    <label>Remind me via:</label>
+                                    <select id="task-reminder-type">
+                                        <option value="none">No reminder</option>
+                                        <option value="notification">Browser notification</option>
+                                        <option value="email">Email</option>
+                                    </select>
+                                </div>
+                                <div class="reminder-timing-field" id="reminder-timing-field" style="display: none;">
+                                    <label>When:</label>
+                                    <select id="task-reminder-timing">
+                                        <option value="10min">10 minutes before</option>
+                                        <option value="30min">30 minutes before</option>
+                                        <option value="1hour" selected>1 hour before</option>
+                                        <option value="2hours">2 hours before</option>
+                                        <option value="1day">1 day before</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="task-input-actions">
                         <button class="btn btn-success" id="save-task-btn">
                             <i class="fas fa-check"></i> Save
@@ -114,6 +148,40 @@
             </div>
             <div class="modal-body">
                 <input type="text" id="edit-task-input" placeholder="Task description..." maxlength="200">
+                <div class="task-datetime-container">
+                    <div class="datetime-row">
+                        <div class="date-field">
+                            <label for="edit-task-due-date">Due Date:</label>
+                            <input type="date" id="edit-task-due-date">
+                        </div>
+                        <div class="time-field">
+                            <label for="edit-task-due-time">Time:</label>
+                            <input type="time" id="edit-task-due-time">
+                        </div>
+                    </div>
+                    <div class="reminder-settings" id="edit-reminder-settings" style="display: none;">
+                        <div class="reminder-row">
+                            <div class="reminder-type-field">
+                                <label>Remind me via:</label>
+                                <select id="edit-task-reminder-type">
+                                    <option value="none">No reminder</option>
+                                    <option value="notification">Browser notification</option>
+                                    <option value="email">Email</option>
+                                </select>
+                            </div>
+                            <div class="reminder-timing-field" id="edit-reminder-timing-field" style="display: none;">
+                                <label>When:</label>
+                                <select id="edit-task-reminder-timing">
+                                    <option value="10min">10 minutes before</option>
+                                    <option value="30min">30 minutes before</option>
+                                    <option value="1hour">1 hour before</option>
+                                    <option value="2hours">2 hours before</option>
+                                    <option value="1day">1 day before</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" id="save-edit-task-btn">Save</button>

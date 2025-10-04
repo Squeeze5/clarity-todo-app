@@ -180,6 +180,12 @@ body {
     color: white;
 }
 
+.folder-item.drag-over {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
 .task-area {
     flex: 1;
     padding: 2rem;
@@ -319,6 +325,35 @@ body {
     color: #94a3b8;
 }
 
+.task-date-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.task-date-container label {
+    font-size: 0.875rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.task-date-container input[type="date"] {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    color: #1e293b;
+    background: white;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.task-date-container input[type="date"]:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
 .task-input-actions {
     display: flex;
     gap: 0.75rem;
@@ -354,6 +389,23 @@ body {
     border-color: #bbf7d0;
 }
 
+.drag-handle {
+    color: #cbd5e1;
+    cursor: grab;
+    margin-right: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.task-item:hover .drag-handle {
+    opacity: 1;
+}
+
+.task-item.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
 .task-checkbox {
     width: 20px;
     height: 20px;
@@ -387,6 +439,47 @@ body {
 .task-item.completed .task-text {
     text-decoration: line-through;
     color: #9ca3af;
+}
+
+.task-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.task-due-date {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+.task-due-date i {
+    font-size: 0.75rem;
+}
+
+.task-due-date.overdue {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.task-due-date.due-soon {
+    color: #f59e0b;
+    font-weight: 600;
+}
+
+.overdue-badge {
+    background: #fef2f2;
+    color: #ef4444;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .task-actions {
@@ -650,6 +743,154 @@ body {
 .folder-item:not(.active):not([data-folder-id="default"]) {
     border-left: 4px solid transparent;
     padding-left: calc(1rem - 4px);
+}
+
+/* Date and Time Styles */
+.task-datetime-container {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f9fafb;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.datetime-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.date-field,
+.time-field {
+    flex: 1;
+}
+
+.task-datetime-container label {
+    display: block;
+    margin-bottom: 5px;
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.task-datetime-container input[type="date"],
+.task-datetime-container input[type="time"] {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: white;
+    color: #1f2937;
+    transition: border-color 0.15s;
+}
+
+.task-datetime-container input[type="date"]:focus,
+.task-datetime-container input[type="time"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Reminder Settings */
+.reminder-settings {
+    padding-top: 15px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.reminder-row {
+    display: flex;
+    gap: 15px;
+}
+
+.reminder-type-field,
+.reminder-timing-field {
+    flex: 1;
+}
+
+.reminder-settings select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: white;
+    color: #1f2937;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.reminder-settings select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Notification Permission Banner */
+.notification-permission-banner {
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.notification-permission-banner i {
+    color: #f59e0b;
+    font-size: 1.25rem;
+}
+
+.notification-permission-banner button {
+    margin-left: auto;
+    padding: 6px 12px;
+    background: #f59e0b;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.notification-permission-banner button:hover {
+    background: #d97706;
+}
+
+/* Due date display enhancements */
+.task-due-date .time-badge {
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 4px;
+}
+
+.task-due-date.overdue .time-badge {
+    background: #fee2e2;
+}
+
+.task-due-date.due-soon .time-badge {
+    background: #fed7aa;
+}
+
+/* Reminder indicator */
+.task-reminder-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding: 2px 6px;
+    background: #dbeafe;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    color: #1e40af;
+}
+
+.task-reminder-indicator i {
+    font-size: 0.75rem;
 }
 
 @media (max-width: 768px) {

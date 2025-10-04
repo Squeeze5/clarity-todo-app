@@ -21,6 +21,12 @@ const _schema = i.schema({
       text: i.string(), // task description
       done: i.boolean(), // completion status
       createdAt: i.number().indexed(), // creation timestamp for ordering
+      dueDate: i.number().indexed().optional(), // due date timestamp (optional)
+      dueTime: i.string().optional(), // time in HH:MM format (optional)
+      reminderType: i.string().optional(), // 'email', 'notification', or 'none'
+      reminderTiming: i.string().optional(), // '10min', '30min', '1hour', '2hours', '1day', etc.
+      reminderSent: i.boolean().optional(), // track if reminder was sent
+      reminderTimestamp: i.number().indexed().optional(), // calculated timestamp for when to send reminder
       userId: i.string().indexed().optional(), // owner user ID
     }),
   },

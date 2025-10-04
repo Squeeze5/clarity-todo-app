@@ -407,10 +407,16 @@ class TodoApp {
         // Store user info
         this.user = user;
         this.userId = user?.id || user?.userId;
+        this.userEmail = user?.email || 'user@example.com';
         console.log('Current user ID:', this.userId);
+        
+        // Initialize reminder checking
+        this.reminderInterval = null;
+        this.notificationPermissionGranted = false;
 
         this.initEventListeners();
         this.setupReactiveQueries();
+        this.initializeReminders();
     }
 
     initEventListeners() {
@@ -467,7 +473,223 @@ class TodoApp {
             if (e.target === e.currentTarget) this.handleConfirmationResponse(false);
         });
 
+        // Date/time and reminder event listeners
+        this.addListener('task-due-date', 'change', (e) => this.handleDateChange(e, 'task'));
+        this.addListener('edit-task-due-date', 'change', (e) => this.handleDateChange(e, 'edit'));
+        this.addListener('task-reminder-type', 'change', (e) => this.handleReminderTypeChange(e, 'task'));
+        this.addListener('edit-task-reminder-type', 'change', (e) => this.handleReminderTypeChange(e, 'edit'));
+        
         console.log('Event listeners initialized');
+    }
+    
+    // Notification and Reminder System
+    async initializeReminders() {
+        // Check notification permission status
+        if ('Notification' in window) {
+            this.notificationPermissionGranted = Notification.permission === 'granted';
+        }
+        
+        // Start checking for reminders every minute
+        this.startReminderCheck();
+    }
+    
+    startReminderCheck() {
+        // Clear any existing interval
+        if (this.reminderInterval) {
+            clearInterval(this.reminderInterval);
+        }
+        
+        // Check for reminders every 30 seconds
+        this.reminderInterval = setInterval(() => {
+            this.checkAndSendReminders();
+        }, 30000); // 30 seconds
+        
+        // Also check immediately
+        this.checkAndSendReminders();
+    }
+    
+    async checkAndSendReminders() {
+        if (!this.tasks) return;
+        
+        const now = Date.now();
+        const tasksToUpdate = [];
+        
+        for (const task of this.tasks) {
+            // Skip if no reminder is set or already sent or task is done
+            if (!task.reminderTimestamp || task.reminderSent || task.done) continue;
+            
+            // Check if it's time to send the reminder
+            if (task.reminderTimestamp <= now) {
+                console.log('Sending reminder for task:', task.text);
+                
+                // Send the appropriate reminder
+                if (task.reminderType === 'notification') {
+                    await this.sendNotificationReminder(task);
+                } else if (task.reminderType === 'email') {
+                    await this.sendEmailReminder(task);
+                }
+                
+                // Mark reminder as sent
+                tasksToUpdate.push(task.id);
+            }
+        }
+        
+        // Update tasks to mark reminders as sent
+        if (tasksToUpdate.length > 0) {
+            const operations = tasksToUpdate.map(taskId => 
+                db.tx.todos[taskId].update({ reminderSent: true })
+            );
+            
+            try {
+                await db.transact(operations);
+            } catch (error) {
+                console.error('Error updating reminder status:', error);
+            }
+        }
+    }
+    
+    async sendNotificationReminder(task) {
+        // First check if we have permission
+        if (!('Notification' in window)) {
+            console.log('Browser does not support notifications');
+            return;
+        }
+        
+        if (Notification.permission === 'default') {
+            // Request permission
+            const permission = await Notification.requestPermission();
+            this.notificationPermissionGranted = permission === 'granted';
+        }
+        
+        if (Notification.permission === 'granted') {
+            const dueDate = new Date(task.dueDate);
+            const timeStr = task.dueTime || '';
+            const dueDateStr = dueDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: dueDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+            });
+            
+            const notification = new Notification('Task Reminder: Clarity Todo', {
+                body: `"${task.text}" is due on ${dueDateStr}${timeStr ? ' at ' + timeStr : ''}`,
+                icon: '/favicon.ico',
+                badge: '/favicon.ico',
+                tag: `task-${task.id}`,
+                requireInteraction: true
+            });
+            
+            notification.onclick = () => {
+                window.focus();
+                notification.close();
+                // Switch to the task's folder
+                if (task.folder_id) {
+                    this.switchFolder(task.folder_id);
+                }
+            };
+        }
+    }
+    
+    async sendEmailReminder(task) {
+        // For email reminders, we'll use EmailJS (free service)
+        // First, the user needs to sign up at https://www.emailjs.com/
+        // For now, we'll just log it
+        console.log('Email reminder would be sent for task:', task.text);
+        console.log('To enable email reminders, integrate with EmailJS or another email service');
+        
+        // If you want to implement EmailJS:
+        // 1. Sign up at https://www.emailjs.com/
+        // 2. Create an email service and template
+        // 3. Include EmailJS SDK: <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+        // 4. Use the following code:
+        /*
+        try {
+            await emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', {
+                to_email: this.userEmail,
+                task_name: task.text,
+                due_date: new Date(task.dueDate).toLocaleString(),
+                message: `Your task "${task.text}" is coming up soon!`
+            });
+            console.log('Email sent successfully');
+        } catch (error) {
+            console.error('Failed to send email:', error);
+        }
+        */
+    }
+    
+    handleDateChange(e, context) {
+        const dateValue = e.target.value;
+        const reminderSettings = context === 'task' ? 
+            document.getElementById('reminder-settings') : 
+            document.getElementById('edit-reminder-settings');
+        
+        if (dateValue) {
+            // Show reminder settings when a date is selected
+            reminderSettings.style.display = 'block';
+        } else {
+            // Hide reminder settings when date is cleared
+            reminderSettings.style.display = 'none';
+        }
+    }
+    
+    handleReminderTypeChange(e, context) {
+        const reminderType = e.target.value;
+        const timingField = context === 'task' ? 
+            document.getElementById('reminder-timing-field') : 
+            document.getElementById('edit-reminder-timing-field');
+        
+        if (reminderType !== 'none') {
+            timingField.style.display = 'block';
+            
+            // Request notification permission if needed
+            if (reminderType === 'notification' && 'Notification' in window) {
+                if (Notification.permission === 'default') {
+                    Notification.requestPermission().then(permission => {
+                        this.notificationPermissionGranted = permission === 'granted';
+                        if (permission === 'denied') {
+                            alert('Browser notifications are blocked. Please enable them in your browser settings to receive reminders.');
+                            // Reset to none
+                            e.target.value = 'none';
+                            timingField.style.display = 'none';
+                        }
+                    });
+                } else if (Notification.permission === 'denied') {
+                    alert('Browser notifications are blocked. Please enable them in your browser settings to receive reminders.');
+                    e.target.value = 'none';
+                    timingField.style.display = 'none';
+                }
+            }
+        } else {
+            timingField.style.display = 'none';
+        }
+    }
+    
+    calculateReminderTimestamp(dueDate, dueTime, reminderTiming) {
+        if (!dueDate || !reminderTiming || reminderTiming === 'none') {
+            return null;
+        }
+        
+        // Start with the due date/time
+        let reminderTime = dueDate;
+        
+        // If there's a specific time, use it
+        if (dueTime) {
+            const [hours, minutes] = dueTime.split(':').map(Number);
+            const tempDate = new Date(dueDate);
+            tempDate.setHours(hours, minutes, 0, 0);
+            reminderTime = tempDate.getTime();
+        }
+        
+        // Calculate the reminder time based on the timing setting
+        const timingMap = {
+            '10min': 10 * 60 * 1000,
+            '30min': 30 * 60 * 1000,
+            '1hour': 60 * 60 * 1000,
+            '2hours': 2 * 60 * 60 * 1000,
+            '1day': 24 * 60 * 60 * 1000
+        };
+        
+        const offset = timingMap[reminderTiming] || 0;
+        return reminderTime - offset;
     }
 
     setupReactiveQueries() {
@@ -747,14 +969,18 @@ class TodoApp {
                 const newTaskId = window.crypto.randomUUID();
                 // Delete old task
                 operations.push(db.tx.todos[task.id].delete());
-                // Create new task in default folder
+                // Create new task in default folder with all fields including dueDate
+                const taskData = {
+                    text: task.text,
+                    done: task.done,
+                    createdAt: task.createdAt,
+                    userId: this.userId
+                };
+                if (task.dueDate) {
+                    taskData.dueDate = task.dueDate;
+                }
                 operations.push(
-                    db.tx.todos[newTaskId].update({
-                        text: task.text,
-                        done: task.done,
-                        createdAt: task.createdAt,
-                        userId: this.userId
-                    }).link({ folder: defaultFolder.id })
+                    db.tx.todos[newTaskId].update(taskData).link({ folder: defaultFolder.id })
                 );
             });
             
@@ -798,13 +1024,29 @@ class TodoApp {
     hideTaskInput() {
         const container = document.getElementById('task-input-container');
         const input = document.getElementById('task-input');
+        const dueDateInput = document.getElementById('task-due-date');
+        const dueTimeInput = document.getElementById('task-due-time');
+        const reminderTypeInput = document.getElementById('task-reminder-type');
+        const reminderTimingInput = document.getElementById('task-reminder-timing');
+        const reminderSettings = document.getElementById('reminder-settings');
+        const reminderTimingField = document.getElementById('reminder-timing-field');
 
         container.style.display = 'none';
         input.value = '';
+        if (dueDateInput) dueDateInput.value = '';
+        if (dueTimeInput) dueTimeInput.value = '';
+        if (reminderTypeInput) reminderTypeInput.value = 'none';
+        if (reminderTimingInput) reminderTimingInput.value = '1hour';
+        if (reminderSettings) reminderSettings.style.display = 'none';
+        if (reminderTimingField) reminderTimingField.style.display = 'none';
     }
 
     async saveTask() {
         const input = document.getElementById('task-input');
+        const dueDateInput = document.getElementById('task-due-date');
+        const dueTimeInput = document.getElementById('task-due-time');
+        const reminderTypeInput = document.getElementById('task-reminder-type');
+        const reminderTimingInput = document.getElementById('task-reminder-timing');
         const text = input.value.trim();
 
         if (!text || !this.currentFolderId) {
@@ -814,14 +1056,48 @@ class TodoApp {
 
         try {
             const todoId = window.crypto.randomUUID();
+            const taskData = {
+                text: text,
+                done: false,
+                createdAt: Date.now(),
+                userId: this.userId,
+                reminderSent: false
+            };
+
+            // Add due date if provided
+            if (dueDateInput && dueDateInput.value) {
+                // Parse the date string as local time (not UTC)
+                const [year, month, day] = dueDateInput.value.split('-').map(Number);
+                const dueDate = new Date(year, month - 1, day); // month is 0-indexed
+                
+                // Add time if provided
+                if (dueTimeInput && dueTimeInput.value) {
+                    const [hours, minutes] = dueTimeInput.value.split(':').map(Number);
+                    dueDate.setHours(hours, minutes, 0, 0);
+                    taskData.dueTime = dueTimeInput.value;
+                } else {
+                    dueDate.setHours(23, 59, 59, 999); // Set to end of day if no time specified
+                }
+                
+                taskData.dueDate = dueDate.getTime();
+                
+                // Add reminder settings if provided
+                if (reminderTypeInput && reminderTypeInput.value !== 'none') {
+                    taskData.reminderType = reminderTypeInput.value;
+                    taskData.reminderTiming = reminderTimingInput.value || '1hour';
+                    
+                    // Calculate when to send the reminder
+                    taskData.reminderTimestamp = this.calculateReminderTimestamp(
+                        taskData.dueDate,
+                        taskData.dueTime,
+                        taskData.reminderTiming
+                    );
+                }
+            }
+
             await db.transact([
                 db.tx.folders[this.currentFolderId].update({}),  // Reference the folder entity
-                db.tx.todos[todoId].update({
-                    text: text,
-                    done: false,
-                    createdAt: Date.now(),
-                    userId: this.userId
-                }).link({ folder: this.currentFolderId })
+                db.tx.todos[todoId].update(taskData).link({ folder: this.currentFolderId })
             ]);
 
             this.hideTaskInput();
@@ -839,8 +1115,51 @@ class TodoApp {
 
         const modal = document.getElementById('task-modal');
         const input = document.getElementById('edit-task-input');
+        const dueDateInput = document.getElementById('edit-task-due-date');
+        const dueTimeInput = document.getElementById('edit-task-due-time');
+        const reminderTypeInput = document.getElementById('edit-task-reminder-type');
+        const reminderTimingInput = document.getElementById('edit-task-reminder-timing');
+        const reminderSettings = document.getElementById('edit-reminder-settings');
+        const reminderTimingField = document.getElementById('edit-reminder-timing-field');
 
         input.value = task.text;
+        
+        // Set due date if it exists
+        if (dueDateInput && task.dueDate) {
+            const date = new Date(task.dueDate);
+            // Format as YYYY-MM-DD for date input using local date
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+            dueDateInput.value = dateStr;
+            
+            // Show reminder settings since date is set
+            if (reminderSettings) reminderSettings.style.display = 'block';
+        } else if (dueDateInput) {
+            dueDateInput.value = '';
+            if (reminderSettings) reminderSettings.style.display = 'none';
+        }
+        
+        // Set time if it exists
+        if (dueTimeInput) {
+            dueTimeInput.value = task.dueTime || '';
+        }
+        
+        // Set reminder settings
+        if (reminderTypeInput) {
+            reminderTypeInput.value = task.reminderType || 'none';
+            if (task.reminderType && task.reminderType !== 'none') {
+                if (reminderTimingField) reminderTimingField.style.display = 'block';
+            } else {
+                if (reminderTimingField) reminderTimingField.style.display = 'none';
+            }
+        }
+        
+        if (reminderTimingInput) {
+            reminderTimingInput.value = task.reminderTiming || '1hour';
+        }
+        
         modal.classList.add('active');
         input.focus();
         input.select();
@@ -853,6 +1172,10 @@ class TodoApp {
 
     async saveEditTask() {
         const input = document.getElementById('edit-task-input');
+        const dueDateInput = document.getElementById('edit-task-due-date');
+        const dueTimeInput = document.getElementById('edit-task-due-time');
+        const reminderTypeInput = document.getElementById('edit-task-reminder-type');
+        const reminderTimingInput = document.getElementById('edit-task-reminder-timing');
         const text = input.value.trim();
 
         if (!text || !this.editingTaskId) {
@@ -861,10 +1184,59 @@ class TodoApp {
         }
 
         try {
+            const updateData = { text: text };
+            
+            // Handle due date and time
+            if (dueDateInput) {
+                if (dueDateInput.value) {
+                    // Parse the date string as local time
+                    const [year, month, day] = dueDateInput.value.split('-').map(Number);
+                    const dueDate = new Date(year, month - 1, day);
+                    
+                    // Add time if provided
+                    if (dueTimeInput && dueTimeInput.value) {
+                        const [hours, minutes] = dueTimeInput.value.split(':').map(Number);
+                        dueDate.setHours(hours, minutes, 0, 0);
+                        updateData.dueTime = dueTimeInput.value;
+                    } else {
+                        dueDate.setHours(23, 59, 59, 999);
+                        updateData.dueTime = null;
+                    }
+                    
+                    updateData.dueDate = dueDate.getTime();
+                    
+                    // Handle reminder settings
+                    if (reminderTypeInput && reminderTypeInput.value !== 'none') {
+                        updateData.reminderType = reminderTypeInput.value;
+                        updateData.reminderTiming = reminderTimingInput.value || '1hour';
+                        updateData.reminderSent = false; // Reset reminder sent status
+                        
+                        // Calculate when to send the reminder
+                        updateData.reminderTimestamp = this.calculateReminderTimestamp(
+                            updateData.dueDate,
+                            updateData.dueTime,
+                            updateData.reminderTiming
+                        );
+                    } else {
+                        // Clear reminder settings
+                        updateData.reminderType = null;
+                        updateData.reminderTiming = null;
+                        updateData.reminderTimestamp = null;
+                        updateData.reminderSent = null;
+                    }
+                } else {
+                    // Clear all date/time/reminder fields
+                    updateData.dueDate = null;
+                    updateData.dueTime = null;
+                    updateData.reminderType = null;
+                    updateData.reminderTiming = null;
+                    updateData.reminderTimestamp = null;
+                    updateData.reminderSent = null;
+                }
+            }
+            
             await db.transact([
-                db.tx.todos[this.editingTaskId].update({
-                    text: text
-                })
+                db.tx.todos[this.editingTaskId].update(updateData)
             ]);
 
             this.hideTaskModal();
@@ -999,6 +1371,11 @@ class TodoApp {
                 userId: this.userId
             };
             
+            // Preserve due date if it exists
+            if (task.dueDate) {
+                taskData.dueDate = task.dueDate;
+            }
+            
             // Create new task ID
             const newTaskId = window.crypto.randomUUID();
             
@@ -1112,6 +1489,27 @@ class TodoApp {
                 task.text.toLowerCase().includes(this.searchQuery)
             );
         }
+        
+        // Sort tasks: overdue first, then by due date, then by creation date
+        filteredTasks.sort((a, b) => {
+            const now = Date.now();
+            const aOverdue = a.dueDate && !a.done && a.dueDate < now;
+            const bOverdue = b.dueDate && !b.done && b.dueDate < now;
+            
+            // Overdue tasks come first
+            if (aOverdue && !bOverdue) return -1;
+            if (!aOverdue && bOverdue) return 1;
+            
+            // Then sort by due date (earliest first)
+            if (a.dueDate && b.dueDate) {
+                return a.dueDate - b.dueDate;
+            }
+            if (a.dueDate && !b.dueDate) return -1;
+            if (!a.dueDate && b.dueDate) return 1;
+            
+            // Finally sort by creation date
+            return b.createdAt - a.createdAt;
+        });
 
         if (filteredTasks.length === 0) {
             const emptyMessage = this.searchQuery
@@ -1135,6 +1533,60 @@ class TodoApp {
             taskEl.className = `task-item ${task.done ? 'completed' : ''}`;
             taskEl.draggable = true;
 
+            // Check if task is overdue or due soon
+            let dueDateHTML = '';
+            if (task.dueDate) {
+                const now = Date.now();
+                const dueDate = new Date(task.dueDate);
+                const isOverdue = !task.done && task.dueDate < now;
+                const isDueSoon = !task.done && !isOverdue && (task.dueDate - now) < 86400000; // Less than 24 hours
+                
+                const dateStr = dueDate.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: dueDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                });
+                
+                let className = 'task-due-date';
+                let statusText = '';
+                
+                if (isOverdue) {
+                    className += ' overdue';
+                    statusText = ' (Overdue)';
+                } else if (isDueSoon) {
+                    className += ' due-soon';
+                    statusText = ' (Due Soon)';
+                }
+                
+                // Add time if specified
+                let timeHTML = '';
+                if (task.dueTime) {
+                    timeHTML = `<span class="time-badge">${task.dueTime}</span>`;
+                }
+                
+                // Add reminder indicator
+                let reminderHTML = '';
+                if (task.reminderType && task.reminderType !== 'none') {
+                    const reminderIcon = task.reminderType === 'notification' ? 'fa-bell' : 'fa-envelope';
+                    const reminderStatus = task.reminderSent ? ' (Sent)' : '';
+                    reminderHTML = `
+                        <span class="task-reminder-indicator">
+                            <i class="fas ${reminderIcon}"></i>
+                            ${task.reminderTiming}${reminderStatus}
+                        </span>
+                    `;
+                }
+                
+                dueDateHTML = `
+                    <div class="${className}">
+                        <i class="far fa-calendar"></i>
+                        <span>Due ${dateStr}${statusText}</span>
+                        ${timeHTML}
+                        ${reminderHTML}
+                    </div>
+                `;
+            }
+
             taskEl.innerHTML = `
                 <div class="drag-handle">
                     <i class="fas fa-grip-vertical"></i>
@@ -1142,7 +1594,10 @@ class TodoApp {
                 <div class="task-checkbox ${task.done ? 'checked' : ''}" onclick="todoApp.toggleTask('${task.id}')">
                     ${task.done ? '<i class="fas fa-check"></i>' : ''}
                 </div>
-                <div class="task-text">${task.text}</div>
+                <div class="task-info">
+                    <div class="task-text">${task.text}</div>
+                    ${dueDateHTML}
+                </div>
                 <div class="task-actions">
                     <button class="task-action-btn edit" onclick="todoApp.showTaskModal('${task.id}')" title="Edit">
                         <i class="fas fa-edit"></i>
