@@ -31,6 +31,7 @@ const _schema = i.schema({
       reminderSent: i.boolean().optional(), // track if reminder was sent
       reminderTimestamp: i.number().indexed().optional(), // calculated timestamp for when to send reminder
       userId: i.string().indexed().optional(), // owner user ID
+      userEmail: i.string().optional(), // user email for sending reminders
     }),
     subtasks: i.entity({
       text: i.string(), // subtask description
