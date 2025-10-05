@@ -24,6 +24,9 @@
                     <button class="btn btn-primary" id="add-folder-btn">
                         <i class="fas fa-folder-plus"></i> New Folder
                     </button>
+                    <button class="theme-toggle" id="theme-toggle-btn" title="Toggle Dark Mode">
+                        <i class="fas fa-moon" id="theme-icon"></i>
+                    </button>
                 </div>
             </div>
         </header>
@@ -43,11 +46,19 @@
             </aside>
 
             <main class="task-area">
+                <div class="breadcrumb" id="breadcrumb-nav" style="display: none;">
+                    <!-- Breadcrumb navigation will be inserted here -->
+                </div>
                 <div class="task-header">
                     <h2 id="current-folder-title">Inbox</h2>
-                    <button class="btn btn-primary" id="add-task-btn">
-                        <i class="fas fa-plus"></i> Add Task
-                    </button>
+                    <div class="task-header-actions">
+                        <button class="btn btn-secondary" id="add-subfolder-btn" style="display: none;">
+                            <i class="fas fa-folder-plus"></i> Create Subfolder
+                        </button>
+                        <button class="btn btn-primary" id="add-task-btn">
+                            <i class="fas fa-plus"></i> Add Task
+                        </button>
+                    </div>
                 </div>
 
                 <div class="task-input-container" id="task-input-container" style="display: none;">

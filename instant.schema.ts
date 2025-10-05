@@ -15,6 +15,9 @@ const _schema = i.schema({
       text: i.string(), // folder name
       color: i.string(), // folder color (#hex)
       isDefault: i.boolean(), // whether this is the default inbox folder
+      parentFolderId: i.string().indexed().optional(), // parent folder ID for subfolders
+      level: i.number().optional(), // nesting level (0 for root, 1 for first level subfolder, etc.)
+      path: i.string().optional(), // full path like "parent/child/grandchild"
       userId: i.string().indexed().optional(), // owner user ID
     }),
     todos: i.entity({

@@ -398,11 +398,13 @@ class TodoApp {
         console.log('TodoApp constructor called with user:', user);
 
         this.currentFolderId = null;
+        this.currentFolderPath = [];
         this.editingTaskId = null;
         this.editingFolderId = null;
         this.draggedTaskId = null;
         this.searchQuery = '';
         this.confirmationCallback = null;
+        this.expandedFolders = new Set();
         
         // Store user info
         this.user = user;
@@ -424,9 +426,16 @@ class TodoApp {
 
         // Add sign out button to header
         this.addSignOutButton();
+        
+        // Initialize theme
+        this.initializeTheme();
+        
+        // Theme toggle
+        this.addListener('theme-toggle-btn', 'click', () => this.toggleTheme());
 
         // Folder management
         this.addListener('add-folder-btn', 'click', () => this.showFolderModal());
+        this.addListener('add-subfolder-btn', 'click', () => this.showFolderModal(true));
         this.addListener('save-folder-btn', 'click', () => this.saveFolder());
         this.addListener('cancel-folder-btn', 'click', () => this.hideFolderModal());
         this.addListener('folder-modal-close', 'click', () => this.hideFolderModal());
@@ -721,6 +730,29 @@ class TodoApp {
         const offset = timingMap[reminderTiming] || 0;
         return reminderTime - offset;
     }
+    
+    // Theme Management
+    initializeTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        this.updateThemeIcon(savedTheme);
+    }
+    
+    toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        this.updateThemeIcon(newTheme);
+    }
+    
+    updateThemeIcon(theme) {
+        const icon = document.getElementById('theme-icon');
+        if (icon) {
+            icon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+        }
+    }
 
     setupReactiveQueries() {
         // Set up reactive queries for real-time updates
@@ -884,8 +916,16 @@ class TodoApp {
     }
 
     // Folder Management
-    showFolderModal(folderId = null) {
+    showFolderModal(isSubfolder = false, folderId = null) {
+        // If called with a string (folderId), adjust parameters
+        if (typeof isSubfolder === 'string') {
+            folderId = isSubfolder;
+            isSubfolder = false;
+        }
+        
         this.editingFolderId = folderId;
+        this.isCreatingSubfolder = isSubfolder && !folderId;
+        
         const modal = document.getElementById('folder-modal');
         const title = document.getElementById('folder-modal-title');
         const input = document.getElementById('folder-name-input');
@@ -895,6 +935,11 @@ class TodoApp {
             title.textContent = 'Edit Folder';
             input.value = folder.text;
             this.selectColorByValue(folder.color);
+        } else if (isSubfolder && this.currentFolderId) {
+            const parentFolder = this.folders.find(f => f.id === this.currentFolderId);
+            title.textContent = `New Subfolder in "${parentFolder?.text || 'Folder'}"`;
+            input.value = '';
+            this.selectColorByValue('#3b82f6');
         } else {
             title.textContent = 'New Folder';
             input.value = '';
@@ -946,19 +991,36 @@ class TodoApp {
                     })
                 ]);
             } else {
-                // Create new folder
+                // Create new folder or subfolder
                 const folderId = window.crypto.randomUUID();
+                const folderData = {
+                    text: name,
+                    color: color,
+                    isDefault: false,
+                    userId: this.userId,
+                    level: 0,
+                    path: name
+                };
+                
+                // If creating a subfolder, set parent info
+                if (this.isCreatingSubfolder && this.currentFolderId) {
+                    const parentFolder = this.folders.find(f => f.id === this.currentFolderId);
+                    if (parentFolder && !parentFolder.isDefault) {
+                        folderData.parentFolderId = this.currentFolderId;
+                        folderData.level = (parentFolder.level || 0) + 1;
+                        folderData.path = parentFolder.path ? 
+                            `${parentFolder.path}/${name}` : 
+                            `${parentFolder.text}/${name}`;
+                    }
+                }
+                
                 await db.transact([
-                    db.tx.folders[folderId].update({
-                        text: name,
-                        color: color,
-                        isDefault: false,
-                        userId: this.userId
-                    })
+                    db.tx.folders[folderId].update(folderData)
                 ]);
             }
 
             this.hideFolderModal();
+            this.isCreatingSubfolder = false;
 
         } catch (error) {
             console.error('Error saving folder:', error);
@@ -1032,13 +1094,63 @@ class TodoApp {
 
     switchFolder(folderId) {
         this.currentFolderId = folderId;
+        const folder = this.folders.find(f => f.id === folderId);
+        
+        // Update breadcrumb
+        this.updateBreadcrumb(folder);
+        
+        // Show/hide subfolder button
+        const subfolderBtn = document.getElementById('add-subfolder-btn');
+        if (subfolderBtn) {
+            // Show subfolder button for non-default folders
+            if (folder && !folder.isDefault) {
+                subfolderBtn.style.display = 'inline-flex';
+            } else {
+                subfolderBtn.style.display = 'none';
+            }
+        }
+        
         this.renderFolders();
         this.renderTasks();
 
-        const folder = this.folders.find(f => f.id === folderId);
         const titleEl = document.getElementById('current-folder-title');
         if (titleEl && folder) {
             titleEl.textContent = folder.text;
+        }
+    }
+    
+    updateBreadcrumb(folder) {
+        const breadcrumb = document.getElementById('breadcrumb-nav');
+        if (!breadcrumb || !folder) return;
+        
+        // Build breadcrumb path
+        const path = [];
+        let currentFolder = folder;
+        
+        while (currentFolder) {
+            path.unshift(currentFolder);
+            if (currentFolder.parentFolderId) {
+                currentFolder = this.folders.find(f => f.id === currentFolder.parentFolderId);
+            } else {
+                currentFolder = null;
+            }
+        }
+        
+        // Only show breadcrumb if there's a hierarchy
+        if (path.length > 1 || (path.length === 1 && path[0].parentFolderId)) {
+            breadcrumb.style.display = 'flex';
+            breadcrumb.innerHTML = path.map((f, index) => {
+                const isLast = index === path.length - 1;
+                return `
+                    <span class="breadcrumb-item" onclick="todoApp.switchFolder('${f.id}')">
+                        <i class="fas fa-folder"></i>
+                        ${f.text}
+                    </span>
+                    ${!isLast ? '<span class="breadcrumb-separator">/</span>' : ''}
+                `;
+            }).join('');
+        } else {
+            breadcrumb.style.display = 'none';
         }
     }
 
@@ -1451,18 +1563,41 @@ class TodoApp {
         if (!folderList) return;
 
         folderList.innerHTML = '';
-
+        
+        // Organize folders hierarchically
+        const rootFolders = this.folders.filter(f => !f.parentFolderId);
+        const foldersByParent = {};
+        
         this.folders.forEach(folder => {
+            if (folder.parentFolderId) {
+                if (!foldersByParent[folder.parentFolderId]) {
+                    foldersByParent[folder.parentFolderId] = [];
+                }
+                foldersByParent[folder.parentFolderId].push(folder);
+            }
+        });
+        
+        // Render folders recursively
+        const renderFolder = (folder, level = 0) => {
             const taskCount = this.tasks.filter(t => t.folder_id === folder.id).length;
+            const hasChildren = foldersByParent[folder.id] && foldersByParent[folder.id].length > 0;
 
             const folderEl = document.createElement('div');
             folderEl.className = `folder-item ${folder.id === this.currentFolderId ? 'active' : ''}`;
+            
+            // Add subfolder classes for indentation
+            if (level > 0) {
+                folderEl.classList.add('subfolder', `subfolder-level-${Math.min(level, 3)}`);
+            }
+            
             folderEl.dataset.folderId = folder.id;
 
             // Apply color styling
             if (!folder.isDefault && folder.id !== this.currentFolderId) {
                 folderEl.style.borderLeft = `4px solid ${folder.color}`;
-                folderEl.style.paddingLeft = 'calc(1rem - 4px)';
+                if (level === 0) {
+                    folderEl.style.paddingLeft = 'calc(1rem - 4px)';
+                }
             }
 
             if (folder.id === this.currentFolderId) {
@@ -1471,8 +1606,12 @@ class TodoApp {
             }
 
             const icon = folder.isDefault ? 'fas fa-inbox' : 'fas fa-folder';
+            const expandIcon = hasChildren ? 
+                (this.expandedFolders.has(folder.id) ? 'fas fa-chevron-down' : 'fas fa-chevron-right') : 
+                '';
 
             folderEl.innerHTML = `
+                ${hasChildren ? `<button class="folder-expand-toggle ${this.expandedFolders.has(folder.id) ? 'expanded' : ''}" onclick="todoApp.toggleFolderExpansion('${folder.id}')"><i class="${expandIcon}"></i></button>` : ''}
                 <i class="${icon}"></i>
                 <span>${folder.text}</span>
                 <span class="task-count">${taskCount}</span>
@@ -1490,7 +1629,7 @@ class TodoApp {
 
             // Click to switch folders
             folderEl.addEventListener('click', (e) => {
-                if (!e.target.closest('.folder-actions')) {
+                if (!e.target.closest('.folder-actions') && !e.target.closest('.folder-expand-toggle')) {
                     this.switchFolder(folder.id);
                 }
             });
@@ -1502,7 +1641,25 @@ class TodoApp {
             folderEl.addEventListener('drop', (e) => this.handleDrop(e, folder.id));
 
             folderList.appendChild(folderEl);
-        });
+            
+            // Render children if expanded
+            if (hasChildren && this.expandedFolders.has(folder.id)) {
+                const children = foldersByParent[folder.id] || [];
+                children.forEach(child => renderFolder(child, level + 1));
+            }
+        };
+        
+        // Render all root folders
+        rootFolders.forEach(folder => renderFolder(folder, 0));
+    }
+    
+    toggleFolderExpansion(folderId) {
+        if (this.expandedFolders.has(folderId)) {
+            this.expandedFolders.delete(folderId);
+        } else {
+            this.expandedFolders.add(folderId);
+        }
+        this.renderFolders();
     }
 
     renderTasks() {
