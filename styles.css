@@ -22,9 +22,9 @@
     --bg-primary: #1a1a1a;
     --bg-secondary: #2d2d2d;
     --bg-tertiary: #404040;
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-tertiary: #94a3b8;
+    --text-primary: #ffffff;
+    --text-secondary: #e2e8f0;
+    --text-tertiary: #cbd5e1;
     --border-color: #404040;
     --shadow-light: rgba(0, 0, 0, 0.3);
     --shadow-medium: rgba(0, 0, 0, 0.5);
@@ -125,7 +125,7 @@ body {
 }
 
 .folder-section h3 {
-    color: #64748b;
+    color: var(--text-secondary);
     font-size: 0.875rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -149,6 +149,7 @@ body {
     transition: all 0.2s ease;
     font-weight: 500;
     position: relative;
+    color: var(--text-primary);
 }
 
 .folder-item:hover {
@@ -244,7 +245,7 @@ body {
 .task-header h2 {
     font-size: 1.5rem;
     font-weight: 600;
-    color: #1e293b;
+    color: var(--text-primary);
 }
 
 .search-container {
@@ -474,13 +475,13 @@ body {
 .task-text {
     flex: 1;
     font-size: 1rem;
-    color: #374151;
+    color: var(--text-primary);
     line-height: 1.5;
 }
 
 .task-item.completed .task-text {
     text-decoration: line-through;
-    color: #9ca3af;
+    color: var(--text-tertiary);
 }
 
 .task-info {
@@ -564,7 +565,7 @@ body {
 .empty-state {
     text-align: center;
     padding: 4rem 2rem;
-    color: #64748b;
+    color: var(--text-secondary);
 }
 
 .empty-state i {
@@ -576,7 +577,7 @@ body {
 .empty-state h3 {
     font-size: 1.25rem;
     margin-bottom: 0.5rem;
-    color: #374151;
+    color: var(--text-primary);
 }
 
 .modal {
@@ -992,27 +993,64 @@ body {
 
 /* Subfolder Styles */
 .folder-item.subfolder {
-    padding-left: 2.5rem;
+    margin-left: 28px;
     position: relative;
 }
 
+/* Tree structure - L-shaped connector */
 .folder-item.subfolder::before {
     content: '';
     position: absolute;
-    left: 1rem;
+    left: -20px;
+    top: 0;
+    width: 20px;
+    height: 50%;
+    border-left: 2px solid var(--text-tertiary);
+    border-bottom: 2px solid var(--text-tertiary);
+}
+
+/* Continuing vertical line for non-last items */
+.folder-item.subfolder:not(.last-subfolder)::after {
+    content: '';
+    position: absolute;
+    left: -20px;
     top: 50%;
-    transform: translateY(-50%);
-    width: 12px;
-    height: 1px;
+    width: 2px;
+    height: 50%;
     background: var(--text-tertiary);
 }
 
+/* Additional indentation for deeper levels */
 .folder-item.subfolder-level-2 {
-    padding-left: 4rem;
+    margin-left: 56px;
+}
+
+.folder-item.subfolder-level-2::before {
+    left: -48px;
+    width: 48px;
 }
 
 .folder-item.subfolder-level-3 {
-    padding-left: 5.5rem;
+    margin-left: 84px;
+}
+
+.folder-item.subfolder-level-3::before {
+    left: -76px;
+    width: 76px;
+}
+
+/* Adjust active subfolder appearance */
+.folder-item.subfolder.active {
+    margin-left: 24px;
+    padding-left: 1rem;
+}
+
+.folder-item.subfolder-level-2.active {
+    margin-left: 52px;
+}
+
+.folder-item.subfolder-level-3.active {
+    margin-left: 80px;
 }
 
 .folder-expand-toggle {
@@ -1021,12 +1059,20 @@ body {
     color: var(--text-secondary);
     cursor: pointer;
     padding: 0.25rem;
-    margin-right: 0.25rem;
+    margin-right: 0.5rem;
     transition: transform 0.2s ease;
+    width: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .folder-expand-toggle.expanded {
     transform: rotate(90deg);
+}
+
+.folder-expand-toggle i {
+    font-size: 0.75rem;
 }
 
 .folder-children {
@@ -1066,10 +1112,32 @@ body {
 [data-theme="dark"] input[type="time"],
 [data-theme="dark"] input[type="email"],
 [data-theme="dark"] input[type="password"],
+[data-theme="dark"] textarea,
 [data-theme="dark"] select {
     background: var(--bg-secondary);
     color: var(--text-primary);
     border-color: var(--border-color);
+}
+
+[data-theme="dark"] label {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .task-datetime-container {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .task-datetime-container label {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .folder-item {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .task-item.completed .task-text {
+    color: var(--text-tertiary);
 }
 
 [data-theme="dark"] .empty-state {

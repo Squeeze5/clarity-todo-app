@@ -1578,7 +1578,7 @@ class TodoApp {
         });
         
         // Render folders recursively
-        const renderFolder = (folder, level = 0) => {
+        const renderFolder = (folder, level = 0, isLast = false) => {
             const taskCount = this.tasks.filter(t => t.folder_id === folder.id).length;
             const hasChildren = foldersByParent[folder.id] && foldersByParent[folder.id].length > 0;
 
@@ -1588,6 +1588,9 @@ class TodoApp {
             // Add subfolder classes for indentation
             if (level > 0) {
                 folderEl.classList.add('subfolder', `subfolder-level-${Math.min(level, 3)}`);
+                if (isLast) {
+                    folderEl.classList.add('last-subfolder');
+                }
             }
             
             folderEl.dataset.folderId = folder.id;
@@ -1645,7 +1648,15 @@ class TodoApp {
             // Render children if expanded
             if (hasChildren && this.expandedFolders.has(folder.id)) {
                 const children = foldersByParent[folder.id] || [];
-                children.forEach(child => renderFolder(child, level + 1));
+                // Create a container for children with connecting lines
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = 'folder-children-container';
+                childrenContainer.style.position = 'relative';
+                
+                children.forEach((child, index) => {
+                    const isLastChild = index === children.length - 1;
+                    renderFolder(child, level + 1, isLastChild);
+                });
             }
         };
         
