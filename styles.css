@@ -1115,8 +1115,13 @@ body {
 [data-theme="dark"] textarea,
 [data-theme="dark"] select {
     background: var(--bg-secondary);
-    color: var(--text-primary);
+    color: #ffffff !important;
     border-color: var(--border-color);
+}
+
+[data-theme="dark"] input::placeholder {
+    color: var(--text-tertiary);
+    opacity: 0.7;
 }
 
 [data-theme="dark"] label {
@@ -1156,6 +1161,270 @@ body {
 [data-theme="dark"] .task-input-container {
     background: var(--bg-secondary);
     border-color: var(--border-color);
+}
+
+/* Subtasks Styling */
+.btn-specify {
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    transition: all 0.2s;
+}
+
+.btn-specify:hover {
+    background: var(--accent-secondary);
+    transform: translateY(-1px);
+}
+
+.subtasks-container {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+}
+
+.subtasks-list {
+    margin-bottom: 1rem;
+}
+
+.subtask-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s;
+}
+
+.subtask-item:hover {
+    background: var(--task-hover);
+    box-shadow: 0 2px 8px var(--shadow-light);
+}
+
+.subtask-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.subtask-checkbox:hover {
+    border-color: var(--accent-primary);
+}
+
+.subtask-checkbox.checked {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.subtask-checkbox.checked i {
+    color: white;
+    font-size: 0.75rem;
+}
+
+.subtask-text {
+    flex: 1;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.subtask-item.completed .subtask-text {
+    text-decoration: line-through;
+    color: var(--text-tertiary);
+}
+
+.subtask-delete {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s;
+    opacity: 0;
+}
+
+.subtask-item:hover .subtask-delete {
+    opacity: 1;
+}
+
+.subtask-delete:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.subtask-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.subtask-input-row input {
+    flex: 1;
+    padding: 0.65rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.subtask-input-row input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.subtask-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-left: 0.5rem;
+    padding: 0.2rem 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+}
+
+.subtask-indicator i {
+    font-size: 0.75rem;
+}
+
+[data-theme="dark"] .subtasks-container {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .subtask-item {
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .subtask-input-row input {
+    background: var(--bg-primary);
+}
+
+/* Task Expand Button */
+.task-expand-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    border-radius: 4px;
+    margin-right: 0.25rem;
+}
+
+.task-expand-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--accent-primary);
+}
+
+.task-expand-btn i {
+    transition: transform 0.2s;
+}
+
+.task-expand-btn.expanded i {
+    transform: rotate(0deg);
+}
+
+/* Expanded Subtasks View */
+.task-subtasks-expanded {
+    margin-left: 3.5rem;
+    margin-right: 1rem;
+    margin-top: -0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-left: 3px solid var(--accent-primary);
+    border-radius: 0 8px 8px 0;
+}
+
+.subtask-item-expanded {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-primary);
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.subtask-item-expanded:last-child {
+    margin-bottom: 0;
+}
+
+.subtask-item-expanded:hover {
+    background: var(--task-hover);
+}
+
+.subtask-item-expanded .subtask-checkbox {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.subtask-item-expanded .subtask-checkbox:hover {
+    border-color: var(--accent-primary);
+}
+
+.subtask-item-expanded .subtask-checkbox.checked {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.subtask-item-expanded .subtask-checkbox.checked i {
+    color: white;
+    font-size: 0.7rem;
+}
+
+.subtask-item-expanded .subtask-text {
+    flex: 1;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.subtask-item-expanded.completed .subtask-text {
+    text-decoration: line-through;
+    color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .task-subtasks-expanded {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .subtask-item-expanded {
+    background: var(--bg-secondary);
 }
 
 @media (max-width: 768px) {

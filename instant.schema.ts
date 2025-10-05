@@ -32,6 +32,12 @@ const _schema = i.schema({
       reminderTimestamp: i.number().indexed().optional(), // calculated timestamp for when to send reminder
       userId: i.string().indexed().optional(), // owner user ID
     }),
+    subtasks: i.entity({
+      text: i.string(), // subtask description
+      done: i.boolean(), // completion status
+      createdAt: i.number().indexed(), // creation timestamp for ordering
+      userId: i.string().indexed().optional(), // owner user ID
+    }),
   },
   links: {
     folderTodos: {
@@ -44,6 +50,18 @@ const _schema = i.schema({
         on: "todos",
         has: "one",
         label: "folder"
+      }
+    },
+    todoSubtasks: {
+      forward: {
+        on: "todos",
+        has: "many",
+        label: "subtasks"
+      },
+      reverse: {
+        on: "subtasks",
+        has: "one",
+        label: "todo"
       }
     }
   },

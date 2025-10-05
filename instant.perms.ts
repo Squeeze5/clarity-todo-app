@@ -18,7 +18,17 @@ const rules = {
     allow: {
       view: "data.userId == auth.id || data.userId == null",
       create: "isAuthenticated",
-      update: "data.userId == auth.id || data.userId == null", 
+      update: "data.userId == auth.id || data.userId == null",
+      delete: "data.userId == auth.id || data.userId == null",
+    },
+    bind: ["isAuthenticated", "data.userId == auth.id || data.userId == null"],
+  },
+  // Users can only access their own subtasks
+  subtasks: {
+    allow: {
+      view: "data.userId == auth.id || data.userId == null",
+      create: "isAuthenticated",
+      update: "data.userId == auth.id || data.userId == null",
       delete: "data.userId == auth.id || data.userId == null",
     },
     bind: ["isAuthenticated", "data.userId == auth.id || data.userId == null"],

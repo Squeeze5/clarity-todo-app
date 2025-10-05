@@ -405,16 +405,21 @@ class TodoApp {
         this.searchQuery = '';
         this.confirmationCallback = null;
         this.expandedFolders = new Set();
-        
+        this.expandedTasks = new Set();
+
         // Store user info
         this.user = user;
         this.userId = user?.id || user?.userId;
         this.userEmail = user?.email || 'user@example.com';
         console.log('Current user ID:', this.userId);
-        
+
         // Initialize reminder checking
         this.reminderInterval = null;
         this.notificationPermissionGranted = false;
+
+        // Temporary subtask storage (before task is saved)
+        this.tempSubtasks = [];
+        this.editTempSubtasks = [];
 
         this.initEventListeners();
         this.setupReactiveQueries();
@@ -487,7 +492,19 @@ class TodoApp {
         this.addListener('edit-task-due-date', 'change', (e) => this.handleDateChange(e, 'edit'));
         this.addListener('task-reminder-type', 'change', (e) => this.handleReminderTypeChange(e, 'task'));
         this.addListener('edit-task-reminder-type', 'change', (e) => this.handleReminderTypeChange(e, 'edit'));
-        
+
+        // Subtask event listeners
+        this.addListener('specify-task-btn', 'click', () => this.toggleSubtaskContainer('subtasks-container'));
+        this.addListener('edit-specify-task-btn', 'click', () => this.toggleSubtaskContainer('edit-subtasks-container'));
+        this.addListener('add-subtask-btn', 'click', () => this.addTempSubtask('subtask-input', 'subtasks-list'));
+        this.addListener('edit-add-subtask-btn', 'click', () => this.addTempSubtask('edit-subtask-input', 'edit-subtasks-list', true));
+        this.addListener('subtask-input', 'keypress', (e) => {
+            if (e.key === 'Enter') this.addTempSubtask('subtask-input', 'subtasks-list');
+        });
+        this.addListener('edit-subtask-input', 'keypress', (e) => {
+            if (e.key === 'Enter') this.addTempSubtask('edit-subtask-input', 'edit-subtasks-list', true);
+        });
+
         console.log('Event listeners initialized');
     }
     
@@ -754,13 +771,153 @@ class TodoApp {
         }
     }
 
+    // Subtask Management
+    toggleSubtaskContainer(containerId) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            if (container.style.display === 'none' || !container.style.display) {
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
+        }
+    }
+
+    addTempSubtask(inputId, listId, isEdit = false) {
+        const input = document.getElementById(inputId);
+        const text = input.value.trim();
+
+        if (!text) return;
+
+        const subtask = {
+            id: window.crypto.randomUUID(),
+            text: text,
+            done: false,
+            isTemp: true
+        };
+
+        if (isEdit) {
+            this.editTempSubtasks.push(subtask);
+        } else {
+            this.tempSubtasks.push(subtask);
+        }
+
+        this.renderTempSubtasks(listId, isEdit);
+        input.value = '';
+    }
+
+    renderTempSubtasks(listId, isEdit = false) {
+        const list = document.getElementById(listId);
+        if (!list) return;
+
+        const subtasks = isEdit ? this.editTempSubtasks : this.tempSubtasks;
+
+        list.innerHTML = '';
+
+        subtasks.forEach(subtask => {
+            const subtaskEl = document.createElement('div');
+            subtaskEl.className = `subtask-item ${subtask.done ? 'completed' : ''}`;
+            subtaskEl.innerHTML = `
+                <div class="subtask-checkbox ${subtask.done ? 'checked' : ''}" onclick="todoApp.toggleTempSubtask('${subtask.id}', '${listId}', ${isEdit})">
+                    ${subtask.done ? '<i class="fas fa-check"></i>' : ''}
+                </div>
+                <div class="subtask-text">${subtask.text}</div>
+                <button class="subtask-delete" onclick="todoApp.deleteTempSubtask('${subtask.id}', '${listId}', ${isEdit})">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            list.appendChild(subtaskEl);
+        });
+    }
+
+    toggleTempSubtask(subtaskId, listId, isEdit = false) {
+        const subtasks = isEdit ? this.editTempSubtasks : this.tempSubtasks;
+        const subtask = subtasks.find(s => s.id === subtaskId);
+
+        if (subtask) {
+            subtask.done = !subtask.done;
+            this.renderTempSubtasks(listId, isEdit);
+        }
+    }
+
+    deleteTempSubtask(subtaskId, listId, isEdit = false) {
+        if (isEdit) {
+            this.editTempSubtasks = this.editTempSubtasks.filter(s => s.id !== subtaskId);
+        } else {
+            this.tempSubtasks = this.tempSubtasks.filter(s => s.id !== subtaskId);
+        }
+
+        this.renderTempSubtasks(listId, isEdit);
+    }
+
+    async toggleSubtask(subtaskId, taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || !task.subtasks) return;
+
+        const subtask = task.subtasks.find(s => s.id === subtaskId);
+        if (!subtask) return;
+
+        try {
+            await db.transact([
+                db.tx.subtasks[subtaskId].update({
+                    done: !subtask.done
+                })
+            ]);
+
+            // Check if all subtasks are completed, if so, complete the parent task
+            this.checkAndCompleteTask(taskId);
+        } catch (error) {
+            console.error('Error toggling subtask:', error);
+        }
+    }
+
+    async deleteSubtask(subtaskId, taskId) {
+        try {
+            await db.transact([
+                db.tx.subtasks[subtaskId].delete()
+            ]);
+        } catch (error) {
+            console.error('Error deleting subtask:', error);
+        }
+    }
+
+    async checkAndCompleteTask(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task || !task.subtasks || task.subtasks.length === 0) return;
+
+        // Check if all subtasks are done
+        const allSubtasksDone = task.subtasks.every(s => s.done);
+
+        if (allSubtasksDone && !task.done) {
+            // Auto-complete the parent task
+            try {
+                await db.transact([
+                    db.tx.todos[taskId].update({
+                        done: true
+                    })
+                ]);
+            } catch (error) {
+                console.error('Error auto-completing task:', error);
+            }
+        }
+    }
+
+    toggleTaskExpansion(taskId) {
+        if (this.expandedTasks.has(taskId)) {
+            this.expandedTasks.delete(taskId);
+        } else {
+            this.expandedTasks.add(taskId);
+        }
+        this.renderTasks();
+    }
+
     setupReactiveQueries() {
         // Set up reactive queries for real-time updates
         console.log('Setting up reactive queries...');
         console.log('Querying folders for user:', this.userId);
         
         // Query only folders and todos belonging to the current user
-        db.subscribeQuery({ 
+        db.subscribeQuery({
             folders: {
                 $: {
                     where: {
@@ -772,9 +929,16 @@ class TodoApp {
                         where: {
                             userId: this.userId
                         }
+                    },
+                    subtasks: {
+                        $: {
+                            where: {
+                                userId: this.userId
+                            }
+                        }
                     }
-                } 
-            } 
+                }
+            }
         }, (resp) => {
             if (resp.error) {
                 console.error('Error querying folders:', resp.error);
@@ -1172,6 +1336,7 @@ class TodoApp {
         const reminderTimingInput = document.getElementById('task-reminder-timing');
         const reminderSettings = document.getElementById('reminder-settings');
         const reminderTimingField = document.getElementById('reminder-timing-field');
+        const subtasksContainer = document.getElementById('subtasks-container');
 
         container.style.display = 'none';
         input.value = '';
@@ -1181,6 +1346,12 @@ class TodoApp {
         if (reminderTimingInput) reminderTimingInput.value = '1hour';
         if (reminderSettings) reminderSettings.style.display = 'none';
         if (reminderTimingField) reminderTimingField.style.display = 'none';
+        if (subtasksContainer) subtasksContainer.style.display = 'none';
+
+        // Clear temp subtasks
+        this.tempSubtasks = [];
+        const subtasksList = document.getElementById('subtasks-list');
+        if (subtasksList) subtasksList.innerHTML = '';
     }
 
     async saveTask() {
@@ -1237,10 +1408,27 @@ class TodoApp {
                 }
             }
 
-            await db.transact([
+            const operations = [
                 db.tx.folders[this.currentFolderId].update({}),  // Reference the folder entity
                 db.tx.todos[todoId].update(taskData).link({ folder: this.currentFolderId })
-            ]);
+            ];
+
+            // Add subtasks if any
+            if (this.tempSubtasks.length > 0) {
+                this.tempSubtasks.forEach(subtask => {
+                    const subtaskData = {
+                        text: subtask.text,
+                        done: subtask.done,
+                        createdAt: Date.now(),
+                        userId: this.userId
+                    };
+                    operations.push(
+                        db.tx.subtasks[subtask.id].update(subtaskData).link({ todo: todoId })
+                    );
+                });
+            }
+
+            await db.transact(operations);
 
             this.hideTaskInput();
 
@@ -1301,7 +1489,28 @@ class TodoApp {
         if (reminderTimingInput) {
             reminderTimingInput.value = task.reminderTiming || '1hour';
         }
-        
+
+        // Load existing subtasks
+        this.editTempSubtasks = [];
+        const subtasksContainer = document.getElementById('edit-subtasks-container');
+
+        if (task.subtasks && task.subtasks.length > 0) {
+            // Show subtask container if there are subtasks
+            if (subtasksContainer) subtasksContainer.style.display = 'block';
+
+            // Load subtasks into temp array
+            this.editTempSubtasks = task.subtasks.map(s => ({
+                id: s.id,
+                text: s.text,
+                done: s.done,
+                isTemp: false  // These are existing subtasks, not temp
+            }));
+
+            this.renderTempSubtasks('edit-subtasks-list', true);
+        } else {
+            if (subtasksContainer) subtasksContainer.style.display = 'none';
+        }
+
         modal.classList.add('active');
         input.focus();
         input.select();
@@ -1309,6 +1518,14 @@ class TodoApp {
 
     hideTaskModal() {
         document.getElementById('task-modal').classList.remove('active');
+        const subtasksContainer = document.getElementById('edit-subtasks-container');
+        if (subtasksContainer) subtasksContainer.style.display = 'none';
+
+        // Clear edit temp subtasks
+        this.editTempSubtasks = [];
+        const subtasksList = document.getElementById('edit-subtasks-list');
+        if (subtasksList) subtasksList.innerHTML = '';
+
         this.editingTaskId = null;
     }
 
@@ -1377,9 +1594,44 @@ class TodoApp {
                 }
             }
             
-            await db.transact([
+            const operations = [
                 db.tx.todos[this.editingTaskId].update(updateData)
-            ]);
+            ];
+
+            // Handle subtasks
+            const task = this.tasks.find(t => t.id === this.editingTaskId);
+            const existingSubtasks = task?.subtasks || [];
+            const existingSubtaskIds = existingSubtasks.map(s => s.id);
+            const currentSubtaskIds = this.editTempSubtasks.map(s => s.id);
+
+            // Delete subtasks that were removed
+            existingSubtasks.forEach(subtask => {
+                if (!currentSubtaskIds.includes(subtask.id)) {
+                    operations.push(db.tx.subtasks[subtask.id].delete());
+                }
+            });
+
+            // Update or create subtasks
+            this.editTempSubtasks.forEach(subtask => {
+                const subtaskData = {
+                    text: subtask.text,
+                    done: subtask.done,
+                    createdAt: existingSubtaskIds.includes(subtask.id) ? subtask.createdAt : Date.now(),
+                    userId: this.userId
+                };
+
+                if (existingSubtaskIds.includes(subtask.id)) {
+                    // Update existing subtask
+                    operations.push(db.tx.subtasks[subtask.id].update(subtaskData));
+                } else {
+                    // Create new subtask
+                    operations.push(
+                        db.tx.subtasks[subtask.id].update(subtaskData).link({ todo: this.editingTaskId })
+                    );
+                }
+            });
+
+            await db.transact(operations);
 
             this.hideTaskModal();
 
@@ -1785,15 +2037,38 @@ class TodoApp {
                 `;
             }
 
+            // Check if task has subtasks
+            const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+            const isExpanded = this.expandedTasks.has(task.id);
+            let subtaskIndicatorHTML = '';
+            let expandButtonHTML = '';
+
+            if (hasSubtasks) {
+                const completedCount = task.subtasks.filter(s => s.done).length;
+                const totalCount = task.subtasks.length;
+                subtaskIndicatorHTML = `
+                    <span class="subtask-indicator">
+                        <i class="fas fa-list"></i> ${completedCount}/${totalCount}
+                    </span>
+                `;
+
+                expandButtonHTML = `
+                    <button class="task-expand-btn ${isExpanded ? 'expanded' : ''}" onclick="todoApp.toggleTaskExpansion('${task.id}')" title="${isExpanded ? 'Collapse' : 'Expand'} subtasks">
+                        <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'}"></i>
+                    </button>
+                `;
+            }
+
             taskEl.innerHTML = `
                 <div class="drag-handle">
                     <i class="fas fa-grip-vertical"></i>
                 </div>
+                ${expandButtonHTML}
                 <div class="task-checkbox ${task.done ? 'checked' : ''}" onclick="todoApp.toggleTask('${task.id}')">
                     ${task.done ? '<i class="fas fa-check"></i>' : ''}
                 </div>
                 <div class="task-info">
-                    <div class="task-text">${task.text}</div>
+                    <div class="task-text">${task.text}${subtaskIndicatorHTML}</div>
                     ${dueDateHTML}
                 </div>
                 <div class="task-actions">
@@ -1811,6 +2086,26 @@ class TodoApp {
             taskEl.addEventListener('dragend', (e) => this.handleDragEnd(e));
 
             taskList.appendChild(taskEl);
+
+            // Render expanded subtasks if expanded
+            if (hasSubtasks && isExpanded) {
+                const subtasksContainer = document.createElement('div');
+                subtasksContainer.className = 'task-subtasks-expanded';
+
+                task.subtasks.forEach(subtask => {
+                    const subtaskEl = document.createElement('div');
+                    subtaskEl.className = `subtask-item-expanded ${subtask.done ? 'completed' : ''}`;
+                    subtaskEl.innerHTML = `
+                        <div class="subtask-checkbox ${subtask.done ? 'checked' : ''}" onclick="todoApp.toggleSubtask('${subtask.id}', '${task.id}')">
+                            ${subtask.done ? '<i class="fas fa-check"></i>' : ''}
+                        </div>
+                        <div class="subtask-text">${subtask.text}</div>
+                    `;
+                    subtasksContainer.appendChild(subtaskEl);
+                });
+
+                taskList.appendChild(subtasksContainer);
+            }
         });
     }
 }

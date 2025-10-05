@@ -63,6 +63,18 @@
 
                 <div class="task-input-container" id="task-input-container" style="display: none;">
                     <input type="text" id="task-input" placeholder="Enter your task..." maxlength="200">
+                    <button class="btn btn-specify" id="specify-task-btn" type="button">
+                        <i class="fas fa-list"></i> Specify
+                    </button>
+                    <div class="subtasks-container" id="subtasks-container" style="display: none;">
+                        <div class="subtasks-list" id="subtasks-list"></div>
+                        <div class="subtask-input-row">
+                            <input type="text" id="subtask-input" placeholder="Add a bullet point..." maxlength="200">
+                            <button class="btn btn-sm btn-success" id="add-subtask-btn">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
                     <div class="task-datetime-container">
                         <div class="datetime-row">
                             <div class="date-field">
@@ -159,6 +171,18 @@
             </div>
             <div class="modal-body">
                 <input type="text" id="edit-task-input" placeholder="Task description..." maxlength="200">
+                <button class="btn btn-specify" id="edit-specify-task-btn" type="button">
+                    <i class="fas fa-list"></i> Specify
+                </button>
+                <div class="subtasks-container" id="edit-subtasks-container" style="display: none;">
+                    <div class="subtasks-list" id="edit-subtasks-list"></div>
+                    <div class="subtask-input-row">
+                        <input type="text" id="edit-subtask-input" placeholder="Add a bullet point..." maxlength="200">
+                        <button class="btn btn-sm btn-success" id="edit-add-subtask-btn">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
                 <div class="task-datetime-container">
                     <div class="datetime-row">
                         <div class="date-field">
