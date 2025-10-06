@@ -5,10 +5,6 @@
 [functions]
   node_bundler = "esbuild"
 
-# Scheduled function to check reminders every 5 minutes
-[functions."check-reminders"]
-  schedule = "*/5 * * * *"
-
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

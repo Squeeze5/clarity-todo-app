@@ -536,39 +536,36 @@ class TodoApp {
     
     async checkAndSendReminders() {
         if (!this.tasks) return;
-
+        
         const now = Date.now();
         const tasksToUpdate = [];
-
+        
         for (const task of this.tasks) {
             // Skip if no reminder is set or already sent or task is done
             if (!task.reminderTimestamp || task.reminderSent || task.done) continue;
-
+            
             // Check if it's time to send the reminder
             if (task.reminderTimestamp <= now) {
-                console.log('Reminder due for task:', task.text);
-
-                // ONLY send browser notifications from the frontend
-                // Email reminders are handled by the scheduled Netlify Function
+                console.log('Sending reminder for task:', task.text);
+                
+                // Send the appropriate reminder
                 if (task.reminderType === 'notification') {
                     await this.sendNotificationReminder(task);
-                    // Mark notification reminder as sent
-                    tasksToUpdate.push(task.id);
                 } else if (task.reminderType === 'email') {
-                    // Email reminders are handled by the backend scheduled function
-                    // Just log that we detected it's due
-                    console.log('Email reminder will be sent by scheduled function for:', task.text);
-                    // Don't mark as sent here - let the backend do it
+                    await this.sendEmailReminder(task);
                 }
+                
+                // Mark reminder as sent
+                tasksToUpdate.push(task.id);
             }
         }
-
-        // Update tasks to mark reminders as sent (only for notifications)
+        
+        // Update tasks to mark reminders as sent
         if (tasksToUpdate.length > 0) {
-            const operations = tasksToUpdate.map(taskId =>
+            const operations = tasksToUpdate.map(taskId => 
                 db.tx.todos[taskId].update({ reminderSent: true })
             );
-
+            
             try {
                 await db.transact(operations);
             } catch (error) {
@@ -617,6 +614,64 @@ class TodoApp {
             };
         }
     }
+    
+    async sendEmailReminder(task) {
+        try {
+            console.log('Sending email reminder for task:', task.text);
+            
+            // The function URL will work automatically:
+            // - On production (clarity-todo.netlify.app): uses your site URL
+            // - On localhost: you'll need Netlify CLI (netlify dev) running on port 8888
+            const functionUrl = '/.netlify/functions/send-reminder';
+            
+            const response = await fetch(functionUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    to_email: this.userEmail || this.user?.email || 'user@example.com',
+                    task_name: task.text,
+                    due_date: task.dueDate,
+                    due_time: task.dueTime || null,
+                    reminder_timing: task.reminderTiming || '1hour'
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to send email');
+            }
+            
+            console.log('Email reminder sent successfully:', data);
+            
+            // Show a success notification to the user
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Email Reminder Sent', {
+                    body: `Reminder email sent for "${task.text}"`,
+                    icon: '/favicon.ico',
+                    tag: `email-sent-${task.id}`
+                });
+            }
+            
+        } catch (error) {
+            console.error('Failed to send email reminder:', error);
+            
+            // Fallback: Try to send a browser notification instead
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Email Reminder Failed', {
+                    body: `Could not send email for "${task.text}". Will try browser notification instead.`,
+                    icon: '/favicon.ico',
+                    tag: `email-failed-${task.id}`
+                });
+                
+                // Send browser notification as fallback
+                await this.sendNotificationReminder(task);
+            }
+        }
+    }
+    
     handleDateChange(e, context) {
         const dateValue = e.target.value;
         const reminderSettings = context === 'task' ? 
@@ -1319,7 +1374,6 @@ class TodoApp {
                 done: false,
                 createdAt: Date.now(),
                 userId: this.userId,
-                userEmail: this.userEmail,
                 reminderSent: false
             };
 
