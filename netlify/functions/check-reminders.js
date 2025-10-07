@@ -21,6 +21,8 @@ exports.handler = async (event, context) => {
       };
     }
 
+    console.log('Admin token is set, length:', ADMIN_TOKEN.length);
+
     const db = init({
       appId: APP_ID,
       adminToken: ADMIN_TOKEN
@@ -29,12 +31,14 @@ exports.handler = async (event, context) => {
     // Query all todos with pending reminders
     const now = Date.now();
 
+    console.log('Querying InstantDB for todos...');
+
     // Get all todos that have:
     // 1. A reminder timestamp set
     // 2. Reminder not sent yet
     // 3. Not completed
     // 4. Reminder time has passed
-    const { data } = await db.query({
+    const result = await db.query({
       todos: {
         $: {
           where: {
@@ -45,18 +49,21 @@ exports.handler = async (event, context) => {
       }
     });
 
-    if (!data || !data.todos) {
-      console.log('No todos found or query failed');
+    console.log('Query result:', JSON.stringify(result, null, 2));
+
+    if (!result || !result.todos) {
+      console.error('No todos found or query failed. Full result:', JSON.stringify(result, null, 2));
       return {
         statusCode: 200,
         body: JSON.stringify({
           message: 'No reminders to process',
-          checked: 0
+          checked: 0,
+          debug: result
         })
       };
     }
 
-    const todos = data.todos;
+    const todos = result.todos;
     console.log(`Found ${todos.length} todos with reminders not sent`);
 
     // Filter for tasks where reminder time has passed
@@ -133,7 +140,16 @@ async function sendEmailReminder(task) {
     }
 
     // Get user email from the task
-    const userEmail = task.userEmail;
+    let userEmail = task.userEmail;
+
+    // If no email on task, try to get it from the task's userId
+    if (!userEmail && task.userId) {
+      console.log('No userEmail on task, will need to query user separately');
+      // For now, we'll skip this task
+      // TODO: Query $users collection to get email by userId
+      console.error('Task missing userEmail field:', task.text);
+      return false;
+    }
 
     // Validate email exists
     if (!userEmail || userEmail === 'user@example.com') {
