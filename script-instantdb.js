@@ -505,7 +505,50 @@ class TodoApp {
             if (e.key === 'Enter') this.addTempSubtask('edit-subtask-input', 'edit-subtasks-list', true);
         });
 
+        // Quick date button listeners
+        this.addListener('quick-date-today', 'click', () => this.setQuickDate('today', 'task-due-date'));
+        this.addListener('quick-date-tomorrow', 'click', () => this.setQuickDate('tomorrow', 'task-due-date'));
+        this.addListener('quick-date-next-week', 'click', () => this.setQuickDate('next-week', 'task-due-date'));
+        this.addListener('edit-quick-date-today', 'click', () => this.setQuickDate('today', 'edit-task-due-date'));
+        this.addListener('edit-quick-date-tomorrow', 'click', () => this.setQuickDate('tomorrow', 'edit-task-due-date'));
+        this.addListener('edit-quick-date-next-week', 'click', () => this.setQuickDate('next-week', 'edit-task-due-date'));
+
         console.log('Event listeners initialized');
+    }
+
+    // Quick Date Helper
+    setQuickDate(type, inputId) {
+        const dateInput = document.getElementById(inputId);
+        if (!dateInput) return;
+
+        const today = new Date();
+        let targetDate;
+
+        switch(type) {
+            case 'today':
+                targetDate = today;
+                break;
+            case 'tomorrow':
+                targetDate = new Date(today);
+                targetDate.setDate(today.getDate() + 1);
+                break;
+            case 'next-week':
+                targetDate = new Date(today);
+                // Set to next Monday
+                const daysUntilMonday = (8 - today.getDay()) % 7 || 7;
+                targetDate.setDate(today.getDate() + daysUntilMonday);
+                break;
+        }
+
+        if (targetDate) {
+            const year = targetDate.getFullYear();
+            const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const day = String(targetDate.getDate()).padStart(2, '0');
+            dateInput.value = `${year}-${month}-${day}`;
+
+            // Trigger change event to show reminder settings
+            dateInput.dispatchEvent(new Event('change'));
+        }
     }
     
     // Notification and Reminder System
@@ -1276,6 +1319,8 @@ class TodoApp {
     hideTaskInput() {
         const container = document.getElementById('task-input-container');
         const input = document.getElementById('task-input');
+        const description = document.getElementById('task-description');
+        const priority = document.getElementById('task-priority');
         const dueDateInput = document.getElementById('task-due-date');
         const dueTimeInput = document.getElementById('task-due-time');
         const reminderTypeInput = document.getElementById('task-reminder-type');
@@ -1286,6 +1331,8 @@ class TodoApp {
 
         container.style.display = 'none';
         input.value = '';
+        if (description) description.value = '';
+        if (priority) priority.value = '4';
         if (dueDateInput) dueDateInput.value = '';
         if (dueTimeInput) dueTimeInput.value = '';
         if (reminderTypeInput) reminderTypeInput.value = 'none';
@@ -1302,6 +1349,8 @@ class TodoApp {
 
     async saveTask() {
         const input = document.getElementById('task-input');
+        const description = document.getElementById('task-description');
+        const priority = document.getElementById('task-priority');
         const dueDateInput = document.getElementById('task-due-date');
         const dueTimeInput = document.getElementById('task-due-time');
         const reminderTypeInput = document.getElementById('task-reminder-type');
@@ -1317,12 +1366,16 @@ class TodoApp {
             const todoId = window.crypto.randomUUID();
             const taskData = {
                 text: text,
+                description: description?.value.trim() || '',
+                priority: parseInt(priority?.value || '4'),
                 done: false,
                 createdAt: Date.now(),
                 userId: this.userId,
                 userEmail: this.userEmail,
                 reminderSent: false
             };
+
+            console.log('Saving task with data:', taskData);
 
             // Add due date if provided
             if (dueDateInput && dueDateInput.value) {
@@ -1392,6 +1445,8 @@ class TodoApp {
 
         const modal = document.getElementById('task-modal');
         const input = document.getElementById('edit-task-input');
+        const description = document.getElementById('edit-task-description');
+        const priority = document.getElementById('edit-task-priority');
         const dueDateInput = document.getElementById('edit-task-due-date');
         const dueTimeInput = document.getElementById('edit-task-due-time');
         const reminderTypeInput = document.getElementById('edit-task-reminder-type');
@@ -1400,6 +1455,8 @@ class TodoApp {
         const reminderTimingField = document.getElementById('edit-reminder-timing-field');
 
         input.value = task.text;
+        if (description) description.value = task.description || '';
+        if (priority) priority.value = task.priority || '4';
         
         // Set due date if it exists
         if (dueDateInput && task.dueDate) {
@@ -1478,6 +1535,8 @@ class TodoApp {
 
     async saveEditTask() {
         const input = document.getElementById('edit-task-input');
+        const description = document.getElementById('edit-task-description');
+        const priority = document.getElementById('edit-task-priority');
         const dueDateInput = document.getElementById('edit-task-due-date');
         const dueTimeInput = document.getElementById('edit-task-due-time');
         const reminderTypeInput = document.getElementById('edit-task-reminder-type');
@@ -1490,7 +1549,11 @@ class TodoApp {
         }
 
         try {
-            const updateData = { text: text };
+            const updateData = {
+                text: text,
+                description: description?.value.trim() || '',
+                priority: parseInt(priority?.value || '4')
+            };
             
             // Handle due date and time
             if (dueDateInput) {
@@ -1926,6 +1989,8 @@ class TodoApp {
         taskList.innerHTML = '';
 
         filteredTasks.forEach(task => {
+            console.log('Rendering task:', task); // Debug log
+
             const taskEl = document.createElement('div');
             taskEl.className = `task-item ${task.done ? 'completed' : ''}`;
             taskEl.draggable = true;
@@ -1984,6 +2049,42 @@ class TodoApp {
                 `;
             }
 
+            // Priority indicator - show for all priorities P1, P2, P3, P4
+            const priorityColors = {
+                1: '#d32f2f', // P1 - Red
+                2: '#f57c00', // P2 - Orange
+                3: '#1976d2', // P3 - Blue
+                4: '#757575'  // P4 - Gray
+            };
+            const priorityLabels = {
+                1: 'P1',
+                2: 'P2',
+                3: 'P3',
+                4: 'P4'
+            };
+
+            let priorityHTML = '';
+            if (task.priority && task.priority >= 1 && task.priority <= 4) {
+                const priorityColor = priorityColors[task.priority];
+                const priorityLabel = priorityLabels[task.priority];
+                priorityHTML = `
+                    <span class="task-priority priority-${task.priority}" style="color: ${priorityColor}; border-color: ${priorityColor};">
+                        <i class="fas fa-flag"></i> ${priorityLabel}
+                    </span>
+                `;
+            }
+
+            // Description preview - show if description exists and is not empty
+            let descriptionHTML = '';
+            if (task.description && task.description.trim() !== '') {
+                const preview = task.description.length > 100
+                    ? task.description.substring(0, 100) + '...'
+                    : task.description;
+                descriptionHTML = `
+                    <div class="task-description-preview">${preview}</div>
+                `;
+            }
+
             // Check if task has subtasks
             const hasSubtasks = task.subtasks && task.subtasks.length > 0;
             const isExpanded = this.expandedTasks.has(task.id);
@@ -2015,7 +2116,10 @@ class TodoApp {
                     ${task.done ? '<i class="fas fa-check"></i>' : ''}
                 </div>
                 <div class="task-info">
-                    <div class="task-text">${task.text}${subtaskIndicatorHTML}</div>
+                    <div class="task-text">
+                        ${task.text}${subtaskIndicatorHTML}${priorityHTML}
+                    </div>
+                    ${descriptionHTML}
                     ${dueDateHTML}
                 </div>
                 <div class="task-actions">

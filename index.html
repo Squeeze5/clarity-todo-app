@@ -62,9 +62,39 @@
                 </div>
 
                 <div class="task-input-container" id="task-input-container" style="display: none;">
-                    <input type="text" id="task-input" placeholder="Enter your task..." maxlength="200">
+                    <input type="text" id="task-input" placeholder="Task name" maxlength="200">
+
+                    <div class="description-section">
+                        <label for="task-description"><i class="fas fa-align-left"></i> Description</label>
+                        <textarea id="task-description" placeholder="Add details about this task..." rows="4" maxlength="1000"></textarea>
+                    </div>
+
+                    <div class="task-meta-row">
+                        <div class="quick-date-buttons">
+                            <button class="btn btn-sm btn-quick-date" id="quick-date-today" type="button">
+                                <i class="far fa-calendar"></i> Today
+                            </button>
+                            <button class="btn btn-sm btn-quick-date" id="quick-date-tomorrow" type="button">
+                                <i class="far fa-calendar"></i> Tomorrow
+                            </button>
+                            <button class="btn btn-sm btn-quick-date" id="quick-date-next-week" type="button">
+                                <i class="far fa-calendar"></i> Next Week
+                            </button>
+                        </div>
+
+                        <div class="priority-selector">
+                            <label><i class="fas fa-flag"></i> Priority:</label>
+                            <select id="task-priority">
+                                <option value="4">P4</option>
+                                <option value="3">P3</option>
+                                <option value="2">P2</option>
+                                <option value="1">P1</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <button class="btn btn-specify" id="specify-task-btn" type="button">
-                        <i class="fas fa-list"></i> Specify
+                        <i class="fas fa-list"></i> Sub-tasks
                     </button>
                     <div class="subtasks-container" id="subtasks-container" style="display: none;">
                         <div class="subtasks-list" id="subtasks-list"></div>
@@ -75,14 +105,15 @@
                             </button>
                         </div>
                     </div>
+
                     <div class="task-datetime-container">
                         <div class="datetime-row">
                             <div class="date-field">
-                                <label for="task-due-date">Due Date:</label>
+                                <label for="task-due-date"><i class="far fa-calendar"></i> Due Date:</label>
                                 <input type="date" id="task-due-date">
                             </div>
                             <div class="time-field">
-                                <label for="task-due-time">Time:</label>
+                                <label for="task-due-time"><i class="far fa-clock"></i> Time:</label>
                                 <input type="time" id="task-due-time">
                             </div>
                         </div>
@@ -162,7 +193,7 @@
 
     <!-- Task Edit Modal -->
     <div class="modal" id="task-modal">
-        <div class="modal-content">
+        <div class="modal-content modal-content-large">
             <div class="modal-header">
                 <h3>Edit Task</h3>
                 <button class="modal-close" id="task-modal-close">
@@ -170,9 +201,39 @@
                 </button>
             </div>
             <div class="modal-body">
-                <input type="text" id="edit-task-input" placeholder="Task description..." maxlength="200">
+                <input type="text" id="edit-task-input" placeholder="Task name" maxlength="200">
+
+                <div class="description-section">
+                    <label for="edit-task-description"><i class="fas fa-align-left"></i> Description</label>
+                    <textarea id="edit-task-description" placeholder="Add details about this task..." rows="6" maxlength="1000"></textarea>
+                </div>
+
+                <div class="task-meta-row">
+                    <div class="quick-date-buttons">
+                        <button class="btn btn-sm btn-quick-date" id="edit-quick-date-today" type="button">
+                            <i class="far fa-calendar"></i> Today
+                        </button>
+                        <button class="btn btn-sm btn-quick-date" id="edit-quick-date-tomorrow" type="button">
+                            <i class="far fa-calendar"></i> Tomorrow
+                        </button>
+                        <button class="btn btn-sm btn-quick-date" id="edit-quick-date-next-week" type="button">
+                            <i class="far fa-calendar"></i> Next Week
+                        </button>
+                    </div>
+
+                    <div class="priority-selector">
+                        <label><i class="fas fa-flag"></i> Priority:</label>
+                        <select id="edit-task-priority">
+                            <option value="4">P4</option>
+                            <option value="3">P3</option>
+                            <option value="2">P2</option>
+                            <option value="1">P1</option>
+                        </select>
+                    </div>
+                </div>
+
                 <button class="btn btn-specify" id="edit-specify-task-btn" type="button">
-                    <i class="fas fa-list"></i> Specify
+                    <i class="fas fa-list"></i> Sub-tasks
                 </button>
                 <div class="subtasks-container" id="edit-subtasks-container" style="display: none;">
                     <div class="subtasks-list" id="edit-subtasks-list"></div>
@@ -183,14 +244,15 @@
                         </button>
                     </div>
                 </div>
+
                 <div class="task-datetime-container">
                     <div class="datetime-row">
                         <div class="date-field">
-                            <label for="edit-task-due-date">Due Date:</label>
+                            <label for="edit-task-due-date"><i class="far fa-calendar"></i> Due Date:</label>
                             <input type="date" id="edit-task-due-date">
                         </div>
                         <div class="time-field">
-                            <label for="edit-task-due-time">Time:</label>
+                            <label for="edit-task-due-time"><i class="far fa-clock"></i> Time:</label>
                             <input type="time" id="edit-task-due-time">
                         </div>
                     </div>
