@@ -1647,3 +1647,233 @@ body {
         min-width: auto;
     }
 }
+
+/* Sections Styling */
+#sections-container {
+    margin: 1.5rem 0;
+}
+
+.section {
+    margin-bottom: 2rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0.75rem;
+}
+
+.section-collapse-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.section-collapse-btn:hover {
+    color: var(--text-primary);
+}
+
+.section-collapse-btn i {
+    font-size: 0.75rem;
+}
+
+.section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+    margin: 0;
+}
+
+.section-count {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    min-width: 24px;
+    text-align: center;
+}
+
+.section-delete-btn {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.section-header:hover .section-delete-btn {
+    opacity: 1;
+}
+
+.section-delete-btn:hover {
+    color: var(--accent-danger);
+}
+
+.section-content {
+    padding-left: 1.5rem;
+}
+
+.section-tasks {
+    margin-bottom: 0.75rem;
+}
+
+/* Compact Task Items for Sections */
+.task-item-compact {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.task-item-compact:hover {
+    background: var(--bg-secondary);
+}
+
+.task-item-compact.completed .task-text-mini {
+    text-decoration: line-through;
+    color: var(--text-tertiary);
+}
+
+.task-checkbox-mini {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.task-checkbox-mini:hover {
+    border-color: var(--accent-primary);
+}
+
+.task-checkbox-mini.checked {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.task-checkbox-mini.checked i {
+    color: white;
+    font-size: 0.7rem;
+}
+
+.task-content-mini {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.task-text-mini {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.task-priority-mini {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+}
+
+.due-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.due-badge.due-today {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.due-badge.due-tomorrow {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+[data-theme="dark"] .due-badge {
+    background: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .due-badge.due-today {
+    background: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+}
+
+[data-theme="dark"] .due-badge.due-tomorrow {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+}
+
+.task-actions-mini {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.task-item-compact:hover .task-actions-mini {
+    opacity: 1;
+}
+
+.task-actions-mini button {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.task-actions-mini button:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.add-task-in-section-btn {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+}
+
+.add-task-in-section-btn:hover {
+    color: var(--accent-primary);
+    background: var(--bg-secondary);
+}
+
+.add-task-in-section-btn i {
+    font-size: 0.85rem;
+}

@@ -52,6 +52,9 @@
                 <div class="task-header">
                     <h2 id="current-folder-title">Inbox</h2>
                     <div class="task-header-actions">
+                        <button class="btn btn-secondary btn-sm" id="add-section-btn">
+                            <i class="fas fa-layer-group"></i> Add Section
+                        </button>
                         <button class="btn btn-secondary" id="add-subfolder-btn" style="display: none;">
                             <i class="fas fa-folder-plus"></i> Create Subfolder
                         </button>
@@ -60,6 +63,9 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Sections will be rendered here -->
+                <div id="sections-container"></div>
 
                 <div class="task-input-container" id="task-input-container" style="display: none;">
                     <input type="text" id="task-input" placeholder="Task name" maxlength="200">
@@ -322,6 +328,25 @@
             <div class="modal-footer">
                 <button class="btn btn-primary" id="confirm-yes-btn">Yes</button>
                 <button class="btn btn-secondary" id="confirm-no-btn">No</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Modal -->
+    <div class="modal" id="section-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="section-modal-title">New Section</h3>
+                <button class="modal-close" id="section-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="section-name-input" placeholder="Section name..." maxlength="100">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="save-section-btn">Save</button>
+                <button class="btn btn-secondary" id="cancel-section-btn">Cancel</button>
             </div>
         </div>
     </div>

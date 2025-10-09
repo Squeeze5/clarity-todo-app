@@ -445,6 +445,12 @@ class TodoApp {
         this.addListener('cancel-folder-btn', 'click', () => this.hideFolderModal());
         this.addListener('folder-modal-close', 'click', () => this.hideFolderModal());
 
+        // Section management
+        this.addListener('add-section-btn', 'click', () => this.showSectionModal());
+        this.addListener('save-section-btn', 'click', () => this.saveSection());
+        this.addListener('cancel-section-btn', 'click', () => this.hideSectionModal());
+        this.addListener('section-modal-close', 'click', () => this.hideSectionModal());
+
         // Task management
         this.addListener('add-task-btn', 'click', () => this.showTaskInput());
         this.addListener('save-task-btn', 'click', () => this.saveTask());
@@ -926,6 +932,27 @@ class TodoApp {
                             }
                         }
                     }
+                },
+                sections: {
+                    $: {
+                        where: {
+                            userId: this.userId
+                        }
+                    },
+                    todos: {
+                        $: {
+                            where: {
+                                userId: this.userId
+                            }
+                        },
+                        subtasks: {
+                            $: {
+                                where: {
+                                    userId: this.userId
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }, (resp) => {
@@ -933,7 +960,7 @@ class TodoApp {
                 console.error('Error querying folders:', resp.error);
                 return;
             }
-            
+
             this.handleFoldersUpdate(resp.data.folders || []);
         });
         
@@ -1264,6 +1291,7 @@ class TodoApp {
         }
         
         this.renderFolders();
+        this.renderSections(); // Render sections for the folder
         this.renderTasks();
 
         const titleEl = document.getElementById('current-folder-title');
@@ -1308,6 +1336,82 @@ class TodoApp {
     }
 
     // Task Management
+    // Section Management
+    showSectionModal() {
+        const modal = document.getElementById('section-modal');
+        const title = document.getElementById('section-modal-title');
+        const input = document.getElementById('section-name-input');
+
+        title.textContent = 'New Section';
+        input.value = '';
+        modal.classList.add('active');
+        input.focus();
+    }
+
+    hideSectionModal() {
+        document.getElementById('section-modal').classList.remove('active');
+    }
+
+    async saveSection() {
+        const input = document.getElementById('section-name-input');
+        const name = input.value.trim();
+
+        if (!name || !this.currentFolderId) {
+            input.focus();
+            return;
+        }
+
+        try {
+            const sectionId = window.crypto.randomUUID();
+            const sectionData = {
+                text: name,
+                order: Date.now(),
+                createdAt: Date.now(),
+                userId: this.userId
+            };
+
+            await db.transact([
+                db.tx.folders[this.currentFolderId].update({}),
+                db.tx.sections[sectionId].update(sectionData).link({ folder: this.currentFolderId })
+            ]);
+
+            this.hideSectionModal();
+        } catch (error) {
+            console.error('Error saving section:', error);
+        }
+    }
+
+    async deleteSection(sectionId) {
+        const confirmed = await this.showConfirmation(
+            'Delete Section',
+            'Are you sure you want to delete this section? Tasks in this section will be moved to the folder.'
+        );
+
+        if (!confirmed) return;
+
+        try {
+            await db.transact([
+                db.tx.sections[sectionId].delete()
+            ]);
+        } catch (error) {
+            console.error('Error deleting section:', error);
+        }
+    }
+
+    toggleSectionExpansion(sectionId) {
+        if (!this.expandedSections) {
+            this.expandedSections = new Set();
+        }
+
+        if (this.expandedSections.has(sectionId)) {
+            this.expandedSections.delete(sectionId);
+        } else {
+            this.expandedSections.add(sectionId);
+        }
+
+        this.renderSections();
+    }
+
     showTaskInput() {
         const container = document.getElementById('task-input-container');
         const input = document.getElementById('task-input');
@@ -1409,9 +1513,22 @@ class TodoApp {
             }
 
             const operations = [
-                db.tx.folders[this.currentFolderId].update({}),  // Reference the folder entity
-                db.tx.todos[todoId].update(taskData).link({ folder: this.currentFolderId })
+                db.tx.folders[this.currentFolderId].update({})  // Reference the folder entity
             ];
+
+            // Link task to folder and section if applicable
+            if (this.currentSectionId) {
+                operations.push(
+                    db.tx.sections[this.currentSectionId].update({}),
+                    db.tx.todos[todoId].update(taskData)
+                        .link({ folder: this.currentFolderId })
+                        .link({ section: this.currentSectionId })
+                );
+            } else {
+                operations.push(
+                    db.tx.todos[todoId].update(taskData).link({ folder: this.currentFolderId })
+                );
+            }
 
             // Add subtasks if any
             if (this.tempSubtasks.length > 0) {
@@ -1431,6 +1548,7 @@ class TodoApp {
             await db.transact(operations);
 
             this.hideTaskInput();
+            this.currentSectionId = null; // Clear section context
 
         } catch (error) {
             console.error('Error saving task:', error);
@@ -1815,6 +1933,7 @@ class TodoApp {
     // Rendering Methods
     render() {
         this.renderFolders();
+        this.renderSections();
         this.renderTasks();
     }
 
@@ -1935,14 +2054,151 @@ class TodoApp {
         this.renderFolders();
     }
 
+    renderSections() {
+        const sectionsContainer = document.getElementById('sections-container');
+        if (!sectionsContainer) return;
+
+        // Get current folder's sections
+        const currentFolder = this.folders?.find(f => f.id === this.currentFolderId);
+        const sections = currentFolder?.sections || [];
+
+        // Sort sections by order
+        sections.sort((a, b) => a.order - b.order);
+
+        sectionsContainer.innerHTML = '';
+
+        if (sections.length === 0) return;
+
+        // Initialize expandedSections if not exists
+        if (!this.expandedSections) {
+            this.expandedSections = new Set(sections.map(s => s.id)); // All sections expanded by default
+        }
+
+        sections.forEach(section => {
+            const isExpanded = this.expandedSections.has(section.id);
+            const sectionTasks = section.todos || [];
+            const taskCount = sectionTasks.length;
+
+            const sectionEl = document.createElement('div');
+            sectionEl.className = 'section';
+
+            sectionEl.innerHTML = `
+                <div class="section-header">
+                    <button class="section-collapse-btn" onclick="todoApp.toggleSectionExpansion('${section.id}')">
+                        <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'}"></i>
+                    </button>
+                    <h3 class="section-title">${section.text}</h3>
+                    <span class="section-count">${taskCount}</span>
+                    <button class="section-delete-btn" onclick="todoApp.deleteSection('${section.id}')" title="Delete section">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="section-content" style="display: ${isExpanded ? 'block' : 'none'}">
+                    <div class="section-tasks" id="section-tasks-${section.id}"></div>
+                    <button class="add-task-in-section-btn" onclick="todoApp.showTaskInputInSection('${section.id}')">
+                        <i class="fas fa-plus"></i> Add task
+                    </button>
+                </div>
+            `;
+
+            sectionsContainer.appendChild(sectionEl);
+
+            // Render tasks in this section
+            if (isExpanded) {
+                this.renderSectionTasks(section.id, sectionTasks);
+            }
+        });
+    }
+
+    renderSectionTasks(sectionId, tasks) {
+        const container = document.getElementById(`section-tasks-${sectionId}`);
+        if (!container) return;
+
+        if (tasks.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = '';
+
+        tasks.forEach(task => {
+            // Reuse same task rendering logic - simplified version
+            const taskEl = document.createElement('div');
+            taskEl.className = `task-item-compact ${task.done ? 'completed' : ''}`;
+
+            let priorityBadge = '';
+            if (task.priority && task.priority >= 1 && task.priority <= 4) {
+                const colors = { 1: '#d32f2f', 2: '#f57c00', 3: '#1976d2', 4: '#757575' };
+                const labels = { 1: 'P1', 2: 'P2', 3: 'P3', 4: 'P4' };
+                priorityBadge = `<span class="task-priority-mini" style="color: ${colors[task.priority]}">${labels[task.priority]}</span>`;
+            }
+
+            let dueDateBadge = '';
+            if (task.dueDate) {
+                const dueDate = new Date(task.dueDate);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+
+                const taskDate = new Date(task.dueDate);
+                taskDate.setHours(0, 0, 0, 0);
+
+                if (taskDate.getTime() === today.getTime()) {
+                    dueDateBadge = '<span class="due-badge due-today">Today</span>';
+                } else if (taskDate.getTime() === tomorrow.getTime()) {
+                    dueDateBadge = '<span class="due-badge due-tomorrow">Tomorrow</span>';
+                } else {
+                    const dateStr = dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    dueDateBadge = `<span class="due-badge">${dateStr}</span>`;
+                }
+            }
+
+            taskEl.innerHTML = `
+                <div class="task-checkbox-mini ${task.done ? 'checked' : ''}" onclick="todoApp.toggleTask('${task.id}')">
+                    ${task.done ? '<i class="fas fa-check"></i>' : ''}
+                </div>
+                <div class="task-content-mini">
+                    <span class="task-text-mini">${task.text}</span>
+                    ${dueDateBadge}
+                    ${priorityBadge}
+                </div>
+                <div class="task-actions-mini">
+                    <button onclick="todoApp.showTaskModal('${task.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button onclick="todoApp.deleteTask('${task.id}')" title="Delete"><i class="fas fa-trash"></i></button>
+                </div>
+            `;
+
+            container.appendChild(taskEl);
+        });
+    }
+
+    showTaskInputInSection(sectionId) {
+        this.currentSectionId = sectionId;
+        this.showTaskInput();
+    }
+
     renderTasks() {
         if (!this.tasks) return;
         
         const taskList = document.getElementById('task-list');
         if (!taskList) return;
 
-        // Filter tasks by current folder and search query
-        let filteredTasks = this.tasks.filter(task => task.folder_id === this.currentFolderId);
+        // Get all task IDs that are in sections (to exclude them from main task list)
+        const taskIdsInSections = new Set();
+        const currentFolder = this.folders?.find(f => f.id === this.currentFolderId);
+        const sections = currentFolder?.sections || [];
+        sections.forEach(section => {
+            (section.todos || []).forEach(todo => {
+                taskIdsInSections.add(todo.id);
+            });
+        });
+
+        // Filter tasks by current folder and search query, excluding tasks in sections
+        let filteredTasks = this.tasks.filter(task =>
+            task.folder_id === this.currentFolderId &&
+            !taskIdsInSections.has(task.id)
+        );
 
         if (this.searchQuery) {
             filteredTasks = filteredTasks.filter(task =>
