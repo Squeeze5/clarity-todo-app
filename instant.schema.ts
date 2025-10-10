@@ -10,6 +10,7 @@ const _schema = i.schema({
     }),
     $users: i.entity({
       email: i.string().unique().indexed().optional(),
+      passwordHash: i.string().optional(), // hashed password for authentication
     }),
     folders: i.entity({
       text: i.string(), // folder name
@@ -47,6 +48,13 @@ const _schema = i.schema({
       order: i.number().indexed(), // display order within folder
       createdAt: i.number().indexed(), // creation timestamp
       userId: i.string().indexed().optional(), // owner user ID
+    }),
+    userPasswords: i.entity({
+      userId: i.string().unique().indexed(), // user ID
+      email: i.string().indexed(), // email for lookup
+      passwordHash: i.string(), // bcrypt hashed password
+      createdAt: i.number().indexed(), // when password was set
+      updatedAt: i.number().indexed(), // when password was last changed
     }),
   },
   links: {

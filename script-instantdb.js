@@ -51,6 +51,33 @@ async function waitForAuth(maxWaitTime = 3000) {
     return null;
 }
 
+// Password hashing utilities using Web Crypto API
+const PasswordUtils = {
+    async hashPassword(password) {
+        // Simple hash using SHA-256 (not bcrypt, but works in browser)
+        // For production, you'd want to use a proper password hashing library
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    },
+
+    async verifyPassword(password, hashedPassword) {
+        const newHash = await this.hashPassword(password);
+        return newHash === hashedPassword;
+    },
+
+    validatePassword(password) {
+        // Password requirements: at least 8 characters
+        if (password.length < 8) {
+            return { valid: false, message: 'Password must be at least 8 characters long' };
+        }
+        return { valid: true };
+    }
+};
+
 class AuthManager {
     constructor() {
         this.user = null;
@@ -91,30 +118,32 @@ class AuthManager {
         const submitBtn = document.getElementById('auth-submit-btn');
         const toggleBtn = document.getElementById('auth-toggle-btn');
         const confirmPasswordContainer = document.getElementById('auth-confirm-password-container');
+        const passwordField = document.getElementById('auth-password');
+        const confirmPasswordField = document.getElementById('auth-confirm-password');
 
         if (this.isSignUp) {
             title.textContent = 'Sign Up for Clarity Todo';
-            submitBtn.textContent = 'Send Magic Code';
+            submitBtn.textContent = 'Continue';
             toggleBtn.textContent = 'Already have an account? Sign In';
-            confirmPasswordContainer.style.display = 'none'; // InstantDB uses magic codes, no password confirmation needed
+            confirmPasswordContainer.style.display = 'block';
+            passwordField.style.display = 'block';
+            confirmPasswordField.style.display = 'block';
         } else {
             title.textContent = 'Sign In to Clarity Todo';
-            submitBtn.textContent = 'Send Magic Code';
+            submitBtn.textContent = 'Continue';
             toggleBtn.textContent = "Don't have an account? Sign Up";
             confirmPasswordContainer.style.display = 'none';
+            passwordField.style.display = 'block';
+            confirmPasswordField.style.display = 'none';
         }
-
-        // Hide password fields for magic code auth
-        const passwordField = document.getElementById('auth-password');
-        const confirmPasswordField = document.getElementById('auth-confirm-password');
-        passwordField.style.display = 'none';
-        confirmPasswordField.style.display = 'none';
 
         this.clearError();
     }
 
     async handleAuthSubmit() {
         const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value;
+        const confirmPassword = document.getElementById('auth-confirm-password').value;
 
         // Check if InstantDB is available
         if (!db) {
@@ -133,34 +162,107 @@ class AuthManager {
             return;
         }
 
+        if (!password) {
+            this.showError('Please enter your password');
+            return;
+        }
+
+        // Validate password strength for sign up
+        if (this.isSignUp) {
+            const validation = PasswordUtils.validatePassword(password);
+            if (!validation.valid) {
+                this.showError(validation.message);
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                this.showError('Passwords do not match');
+                return;
+            }
+        }
+
         this.setLoading(true);
         this.clearError();
 
         try {
-            // Send magic code
-            await db.auth.sendMagicCode({ email: email });
-            
-            this.showSuccess('Magic code sent! Check your email and enter the code below.');
-            this.showMagicCodeInput();
+            if (this.isSignUp) {
+                // Sign up flow: Send magic code directly for new users
+                await db.auth.sendMagicCode({ email: email });
+
+                // Store password temporarily for after magic code verification
+                this.tempPassword = password;
+                this.tempEmail = email;
+
+                this.showSuccess('Magic code sent! Check your email and enter the code below.');
+                this.showMagicCodeInput();
+            } else {
+                // Sign in flow: Verify password first, then send magic code
+                await this.verifyPasswordAndSendCode(email, password);
+            }
 
         } catch (error) {
             console.error('Auth error:', error);
-            
-            let errorMessage = 'Failed to send magic code';
+
+            let errorMessage = 'Authentication failed';
             if (error.message) {
                 if (error.message.includes('Invalid email')) {
                     errorMessage = 'Please enter a valid email address';
                 } else if (error.message.includes('network')) {
                     errorMessage = 'Network error. Please check your internet connection';
+                } else if (error.message.includes('password')) {
+                    errorMessage = error.message;
                 } else {
                     errorMessage = error.message;
                 }
             }
-            
+
             this.showError(errorMessage);
         } finally {
             this.setLoading(false);
         }
+    }
+
+    async verifyPasswordAndSendCode(email, password) {
+        // Query for the user's password hash using subscribeQuery wrapped in a Promise
+        const result = await new Promise((resolve, reject) => {
+            let unsubscribe;
+            unsubscribe = db.subscribeQuery({
+                userPasswords: {
+                    $: {
+                        where: {
+                            email: email
+                        }
+                    }
+                }
+            }, (resp) => {
+                if (unsubscribe) unsubscribe();
+                if (resp.error) {
+                    reject(resp.error);
+                } else {
+                    resolve(resp.data);
+                }
+            });
+        });
+
+        const userPassword = result?.userPasswords?.[0];
+
+        if (!userPassword) {
+            throw new Error('No account found with this email. Please sign up first.');
+        }
+
+        // Verify the password
+        const isValid = await PasswordUtils.verifyPassword(password, userPassword.passwordHash);
+
+        if (!isValid) {
+            throw new Error('Incorrect password. Please try again.');
+        }
+
+        // Password is correct, send magic code for 2FA
+        await db.auth.sendMagicCode({ email: email });
+
+        this.tempEmail = email;
+        this.showSuccess('Password verified! Magic code sent to your email.');
+        this.showMagicCodeInput();
     }
 
     showMagicCodeInput() {
@@ -259,10 +361,38 @@ class AuthManager {
             // Store user info
             this.user = { id: userId, email: userEmail };
             console.log('User authenticated with ID:', userId);
-            
+
+            // If this is a sign-up with password, store the hashed password
+            if (this.tempPassword) {
+                try {
+                    const hashedPassword = await PasswordUtils.hashPassword(this.tempPassword);
+                    const passwordId = window.instant.id();
+
+                    await db.transact([
+                        db.tx.userPasswords[passwordId].update({
+                            userId: userId,
+                            email: userEmail,
+                            passwordHash: hashedPassword,
+                            createdAt: Date.now(),
+                            updatedAt: Date.now()
+                        })
+                    ]);
+
+                    console.log('Password stored successfully for user:', userId);
+
+                    // Clear temporary password
+                    this.tempPassword = null;
+                    this.tempEmail = null;
+                } catch (passwordError) {
+                    console.error('Failed to store password:', passwordError);
+                    // Don't fail the authentication, just log the error
+                    // User can still use the app, just won't have password auth
+                }
+            }
+
             // Success - user is now authenticated
             this.hideAuthModal();
-            
+
             // Initialize the todo app with user info
             window.todoApp = new TodoApp(this.user);
             
@@ -424,6 +554,24 @@ class TodoApp {
         this.initEventListeners();
         this.setupReactiveQueries();
         this.initializeReminders();
+        this.applyStoredSettings();
+    }
+
+    applyStoredSettings() {
+        // Apply saved settings from localStorage
+        const settings = JSON.parse(localStorage.getItem('claritySettings') || '{}');
+
+        // Apply font size
+        if (settings.fontSize) {
+            this.applyFontSize(settings.fontSize);
+        }
+
+        // Apply compact mode
+        if (settings.compactMode) {
+            this.applyCompactMode(settings.compactMode);
+        }
+
+        // Theme is already applied by initializeTheme()
     }
 
     initEventListeners() {
@@ -669,13 +817,38 @@ class TodoApp {
 
     handleDateChange(e, context) {
         const dateValue = e.target.value;
-        const reminderSettings = context === 'task' ? 
-            document.getElementById('reminder-settings') : 
+        const reminderSettings = context === 'task' ?
+            document.getElementById('reminder-settings') :
             document.getElementById('edit-reminder-settings');
-        
+
         if (dateValue) {
             // Show reminder settings when a date is selected
             reminderSettings.style.display = 'block';
+
+            // Apply default reminder settings only for new tasks (not when editing)
+            if (context === 'task') {
+                const settings = JSON.parse(localStorage.getItem('claritySettings') || '{}');
+
+                // Check if reminder type is currently 'none' (meaning it hasn't been set yet)
+                const reminderTypeSelect = document.getElementById('task-reminder-type');
+                if (reminderTypeSelect && reminderTypeSelect.value === 'none' && settings.defaultReminderType) {
+                    reminderTypeSelect.value = settings.defaultReminderType;
+
+                    // Show timing field if needed
+                    if (settings.defaultReminderType !== 'none') {
+                        const timingField = document.getElementById('reminder-timing-field');
+                        if (timingField) {
+                            timingField.style.display = 'block';
+                        }
+
+                        // Apply default timing
+                        const reminderTimingSelect = document.getElementById('task-reminder-timing');
+                        if (reminderTimingSelect && settings.defaultReminderTiming) {
+                            reminderTimingSelect.value = settings.defaultReminderTiming;
+                        }
+                    }
+                }
+            }
         } else {
             // Hide reminder settings when date is cleared
             reminderSettings.style.display = 'none';
@@ -1019,16 +1192,323 @@ class TodoApp {
     }
 
     addSignOutButton() {
+        // Replaced with profile menu
+        this.addProfileMenu();
+    }
+
+    addProfileMenu() {
         const headerActions = document.querySelector('.header-actions');
-        const signOutBtn = document.createElement('button');
-        signOutBtn.className = 'btn btn-secondary';
-        signOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Sign Out';
-        signOutBtn.addEventListener('click', () => {
+
+        // Create profile menu container
+        const profileContainer = document.createElement('div');
+        profileContainer.className = 'profile-menu-container';
+        profileContainer.id = 'profile-menu-container';
+
+        // Create profile button
+        const profileBtn = document.createElement('button');
+        profileBtn.className = 'profile-button';
+        profileBtn.id = 'profile-button';
+        profileBtn.title = 'Profile';
+
+        // Get user email or default icon
+        const userEmail = this.userEmail || 'User';
+        const userInitial = userEmail.charAt(0).toUpperCase();
+
+        profileBtn.innerHTML = `<div class="profile-avatar">${userInitial}</div>`;
+
+        // Create dropdown menu
+        const dropdown = document.createElement('div');
+        dropdown.className = 'profile-dropdown';
+        dropdown.id = 'profile-dropdown';
+        dropdown.innerHTML = `
+            <div class="profile-dropdown-header">
+                <div class="profile-avatar-large">${userInitial}</div>
+                <div class="profile-info">
+                    <div class="profile-email">${userEmail}</div>
+                </div>
+            </div>
+            <div class="profile-dropdown-divider"></div>
+            <button class="profile-dropdown-item" id="profile-settings-btn">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </button>
+            <button class="profile-dropdown-item" id="profile-activity-btn">
+                <i class="fas fa-history"></i>
+                <span>Activity Log</span>
+            </button>
+            <div class="profile-dropdown-divider"></div>
+            <button class="profile-dropdown-item" id="profile-signout-btn">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Sign Out</span>
+            </button>
+        `;
+
+        profileContainer.appendChild(profileBtn);
+        profileContainer.appendChild(dropdown);
+        headerActions.appendChild(profileContainer);
+
+        // Add event listeners
+        this.setupProfileMenu();
+    }
+
+    setupProfileMenu() {
+        const profileBtn = document.getElementById('profile-button');
+        const dropdown = document.getElementById('profile-dropdown');
+
+        // Toggle dropdown
+        profileBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown?.classList.toggle('active');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.profile-menu-container')) {
+                dropdown?.classList.remove('active');
+            }
+        });
+
+        // Settings button
+        document.getElementById('profile-settings-btn')?.addEventListener('click', () => {
+            dropdown?.classList.remove('active');
+            this.showSettingsModal();
+        });
+
+        // Activity log button
+        document.getElementById('profile-activity-btn')?.addEventListener('click', () => {
+            dropdown?.classList.remove('active');
+            this.showActivityLog();
+        });
+
+        // Sign out button
+        document.getElementById('profile-signout-btn')?.addEventListener('click', () => {
+            dropdown?.classList.remove('active');
             if (window.authManager) {
                 window.authManager.signOut();
             }
         });
-        headerActions.appendChild(signOutBtn);
+    }
+
+    showActivityLog() {
+        // Placeholder for activity log - to be implemented later
+        alert('Activity Log feature coming soon!');
+    }
+
+    // Settings Modal
+    showSettingsModal() {
+        const modal = document.getElementById('settings-modal');
+        modal?.classList.add('active');
+
+        // Load current settings
+        this.loadSettings();
+
+        // Setup tab switching
+        this.setupSettingsTabs();
+
+        // Setup settings event listeners
+        this.setupSettingsListeners();
+    }
+
+    hideSettingsModal() {
+        document.getElementById('settings-modal')?.classList.remove('active');
+    }
+
+    setupSettingsTabs() {
+        const tabButtons = document.querySelectorAll('.settings-tab-btn');
+        const tabs = document.querySelectorAll('.settings-tab');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabName = button.dataset.tab;
+
+                // Remove active class from all buttons and tabs
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabs.forEach(tab => tab.classList.remove('active'));
+
+                // Add active class to clicked button and corresponding tab
+                button.classList.add('active');
+                document.getElementById(`settings-tab-${tabName}`)?.classList.add('active');
+            });
+        });
+    }
+
+    setupSettingsListeners() {
+        // Close button
+        document.getElementById('settings-modal-close')?.addEventListener('click', () => {
+            this.hideSettingsModal();
+        });
+
+        // Cancel button
+        document.getElementById('cancel-settings-btn')?.addEventListener('click', () => {
+            this.hideSettingsModal();
+        });
+
+        // Save button
+        document.getElementById('save-settings-btn')?.addEventListener('click', () => {
+            this.saveSettings();
+        });
+
+        // Export data button
+        document.getElementById('export-data-btn')?.addEventListener('click', () => {
+            this.exportData();
+        });
+
+        // Theme change listener
+        document.getElementById('settings-theme')?.addEventListener('change', (e) => {
+            this.applyThemeSetting(e.target.value);
+        });
+    }
+
+    loadSettings() {
+        // Load settings from localStorage
+        const settings = JSON.parse(localStorage.getItem('claritySettings') || '{}');
+
+        // Account info
+        document.getElementById('settings-email').value = this.userEmail || '';
+        document.getElementById('settings-user-id').value = this.userId || '';
+
+        // General settings
+        document.getElementById('settings-default-priority').value = settings.defaultPriority || '4';
+        document.getElementById('settings-show-completed').checked = settings.showCompleted !== false;
+        document.getElementById('settings-auto-suggest-dates').checked = settings.autoSuggestDates !== false;
+        document.getElementById('settings-tasks-per-page').value = settings.tasksPerPage || '50';
+
+        // Reminder settings
+        document.getElementById('settings-default-reminder-type').value = settings.defaultReminderType || 'none';
+        document.getElementById('settings-default-reminder-timing').value = settings.defaultReminderTiming || '1hour';
+        document.getElementById('settings-email-daily-summary').checked = settings.emailDailySummary || false;
+        document.getElementById('settings-daily-summary-time').value = settings.dailySummaryTime || '08:00';
+
+        // Appearance settings
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        document.getElementById('settings-theme').value = currentTheme;
+        document.getElementById('settings-font-size').value = settings.fontSize || 'medium';
+        document.getElementById('settings-compact-mode').checked = settings.compactMode || false;
+    }
+
+    saveSettings() {
+        // Gather all settings
+        const settings = {
+            defaultPriority: document.getElementById('settings-default-priority').value,
+            showCompleted: document.getElementById('settings-show-completed').checked,
+            autoSuggestDates: document.getElementById('settings-auto-suggest-dates').checked,
+            tasksPerPage: document.getElementById('settings-tasks-per-page').value,
+            defaultReminderType: document.getElementById('settings-default-reminder-type').value,
+            defaultReminderTiming: document.getElementById('settings-default-reminder-timing').value,
+            emailDailySummary: document.getElementById('settings-email-daily-summary').checked,
+            dailySummaryTime: document.getElementById('settings-daily-summary-time').value,
+            fontSize: document.getElementById('settings-font-size').value,
+            compactMode: document.getElementById('settings-compact-mode').checked
+        };
+
+        // Save to localStorage
+        localStorage.setItem('claritySettings', JSON.stringify(settings));
+
+        // Apply theme setting
+        const theme = document.getElementById('settings-theme').value;
+        this.applyThemeSetting(theme);
+
+        // Apply font size
+        this.applyFontSize(settings.fontSize);
+
+        // Apply compact mode
+        this.applyCompactMode(settings.compactMode);
+
+        // Close modal
+        this.hideSettingsModal();
+
+        // Show success message
+        this.showNotification('Settings saved successfully!');
+    }
+
+    applyThemeSetting(theme) {
+        if (theme === 'auto') {
+            // Use system preference
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+            localStorage.setItem('theme', 'auto');
+        } else {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        }
+
+        // Update theme icon
+        const themeIcon = document.getElementById('theme-icon');
+        if (themeIcon) {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            themeIcon.className = currentTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+    }
+
+    applyFontSize(size) {
+        const root = document.documentElement;
+        switch(size) {
+            case 'small':
+                root.style.fontSize = '14px';
+                break;
+            case 'large':
+                root.style.fontSize = '18px';
+                break;
+            default:
+                root.style.fontSize = '16px';
+        }
+    }
+
+    applyCompactMode(enabled) {
+        if (enabled) {
+            document.body.classList.add('compact-mode');
+        } else {
+            document.body.classList.remove('compact-mode');
+        }
+    }
+
+    exportData() {
+        // Export all user data as JSON
+        const exportData = {
+            folders: this.folders,
+            tasks: this.tasks,
+            exportDate: new Date().toISOString(),
+            userId: this.userId,
+            version: '1.0'
+        };
+
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `clarity-todo-export-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+
+        URL.revokeObjectURL(url);
+        this.showNotification('Data exported successfully!');
+    }
+
+    showNotification(message) {
+        // Simple notification - can be enhanced later
+        const notification = document.createElement('div');
+        notification.className = 'notification success';
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--accent-primary);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+        `;
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
     }
 
     addListener(id, event, handler) {
@@ -1418,6 +1898,39 @@ class TodoApp {
 
         container.style.display = 'block';
         input.focus();
+
+        // Apply default settings from localStorage
+        this.applyDefaultTaskSettings();
+    }
+
+    applyDefaultTaskSettings() {
+        const settings = JSON.parse(localStorage.getItem('claritySettings') || '{}');
+
+        // Apply default priority
+        const prioritySelect = document.getElementById('task-priority');
+        if (prioritySelect && settings.defaultPriority) {
+            prioritySelect.value = settings.defaultPriority;
+        }
+
+        // Apply default reminder type
+        const reminderTypeSelect = document.getElementById('task-reminder-type');
+        if (reminderTypeSelect && settings.defaultReminderType) {
+            reminderTypeSelect.value = settings.defaultReminderType;
+
+            // Show/hide reminder timing based on type
+            if (settings.defaultReminderType !== 'none') {
+                const reminderTimingField = document.getElementById('reminder-timing-field');
+                if (reminderTimingField) {
+                    reminderTimingField.style.display = 'block';
+                }
+
+                // Apply default reminder timing
+                const reminderTimingSelect = document.getElementById('task-reminder-timing');
+                if (reminderTimingSelect && settings.defaultReminderTiming) {
+                    reminderTimingSelect.value = settings.defaultReminderTiming;
+                }
+            }
+        }
     }
 
     hideTaskInput() {

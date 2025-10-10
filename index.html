@@ -351,6 +351,196 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content modal-content-large settings-modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="modal-close" id="settings-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="settings-container">
+                <div class="settings-sidebar">
+                    <button class="settings-tab-btn active" data-tab="account">
+                        <i class="fas fa-user"></i>
+                        <span>Account</span>
+                    </button>
+                    <button class="settings-tab-btn" data-tab="general">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>General</span>
+                    </button>
+                    <button class="settings-tab-btn" data-tab="reminders">
+                        <i class="fas fa-bell"></i>
+                        <span>Reminders</span>
+                    </button>
+                    <button class="settings-tab-btn" data-tab="appearance">
+                        <i class="fas fa-palette"></i>
+                        <span>Appearance</span>
+                    </button>
+                </div>
+                <div class="settings-content">
+                    <!-- Account Tab -->
+                    <div class="settings-tab active" id="settings-tab-account">
+                        <h4 class="settings-section-title">Account Information</h4>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Email Address</label>
+                            <input type="email" id="settings-email" class="settings-input" readonly>
+                            <p class="settings-help">Your email address is used for authentication and email reminders</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-label">User ID</label>
+                            <input type="text" id="settings-user-id" class="settings-input" readonly>
+                            <p class="settings-help">Your unique user identifier</p>
+                        </div>
+
+                        <div class="settings-divider"></div>
+
+                        <h4 class="settings-section-title">Data Management</h4>
+
+                        <div class="settings-group">
+                            <button class="btn btn-secondary" id="export-data-btn">
+                                <i class="fas fa-download"></i> Export All Data
+                            </button>
+                            <p class="settings-help">Download all your tasks, folders, and sections as JSON</p>
+                        </div>
+                    </div>
+
+                    <!-- General Tab -->
+                    <div class="settings-tab" id="settings-tab-general">
+                        <h4 class="settings-section-title">Task Defaults</h4>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Default Priority</label>
+                            <select id="settings-default-priority" class="settings-select">
+                                <option value="4">P4 (Lowest)</option>
+                                <option value="3">P3</option>
+                                <option value="2">P2</option>
+                                <option value="1">P1 (Highest)</option>
+                            </select>
+                            <p class="settings-help">Default priority level for new tasks</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-checkbox-label">
+                                <input type="checkbox" id="settings-show-completed" class="settings-checkbox">
+                                <span>Show completed tasks</span>
+                            </label>
+                            <p class="settings-help">Display completed tasks in task lists</p>
+                        </div>
+
+                        <div class="settings-divider"></div>
+
+                        <h4 class="settings-section-title">Productivity</h4>
+
+                        <div class="settings-group">
+                            <label class="settings-checkbox-label">
+                                <input type="checkbox" id="settings-auto-suggest-dates" class="settings-checkbox" checked>
+                                <span>Auto-suggest due dates</span>
+                            </label>
+                            <p class="settings-help">Suggest "Today" for urgent tasks</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Tasks per page</label>
+                            <select id="settings-tasks-per-page" class="settings-select">
+                                <option value="20">20 tasks</option>
+                                <option value="50" selected>50 tasks</option>
+                                <option value="100">100 tasks</option>
+                                <option value="all">Show all</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Reminders Tab -->
+                    <div class="settings-tab" id="settings-tab-reminders">
+                        <h4 class="settings-section-title">Reminder Preferences</h4>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Default Reminder Type</label>
+                            <select id="settings-default-reminder-type" class="settings-select">
+                                <option value="none">No reminder</option>
+                                <option value="notification">Browser notification</option>
+                                <option value="email">Email</option>
+                            </select>
+                            <p class="settings-help">Default reminder method for tasks with due dates</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Default Reminder Timing</label>
+                            <select id="settings-default-reminder-timing" class="settings-select">
+                                <option value="10min">10 minutes before</option>
+                                <option value="30min">30 minutes before</option>
+                                <option value="1hour" selected>1 hour before</option>
+                                <option value="2hours">2 hours before</option>
+                                <option value="1day">1 day before</option>
+                            </select>
+                        </div>
+
+                        <div class="settings-divider"></div>
+
+                        <h4 class="settings-section-title">Email Notifications</h4>
+
+                        <div class="settings-group">
+                            <label class="settings-checkbox-label">
+                                <input type="checkbox" id="settings-email-daily-summary" class="settings-checkbox">
+                                <span>Daily summary email</span>
+                            </label>
+                            <p class="settings-help">Receive a daily email with your tasks due today</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Daily summary time</label>
+                            <input type="time" id="settings-daily-summary-time" class="settings-input" value="08:00">
+                        </div>
+                    </div>
+
+                    <!-- Appearance Tab -->
+                    <div class="settings-tab" id="settings-tab-appearance">
+                        <h4 class="settings-section-title">Theme</h4>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Color Theme</label>
+                            <select id="settings-theme" class="settings-select">
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                                <option value="auto">Auto (System)</option>
+                            </select>
+                            <p class="settings-help">Choose your preferred color theme</p>
+                        </div>
+
+                        <div class="settings-divider"></div>
+
+                        <h4 class="settings-section-title">Display</h4>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Font Size</label>
+                            <select id="settings-font-size" class="settings-select">
+                                <option value="small">Small</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="large">Large</option>
+                            </select>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-checkbox-label">
+                                <input type="checkbox" id="settings-compact-mode" class="settings-checkbox">
+                                <span>Compact mode</span>
+                            </label>
+                            <p class="settings-help">Display more tasks on screen with reduced spacing</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="save-settings-btn">Save Changes</button>
+                <button class="btn btn-secondary" id="cancel-settings-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script src="script-instantdb.js"></script>
 </body>
 </html>
