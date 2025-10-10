@@ -7,9 +7,12 @@ window.confirm = function(message) {
 };
 
 // InstantDB Configuration
-// This is the PUBLIC app ID - it's safe to expose as authentication and permissions protect the data
-// The SECRET admin token is never included in client code
 const APP_ID = '79b71357-9dae-4fa3-8ee4-ab8a43ffefc0';
+
+// EmailJS Configuration
+const EMAILJS_PUBLIC_KEY = 'GyPf9ShKeaop0ahVG'; // EmailJS Public Key
+const EMAILJS_SERVICE_ID = 'service_g2pwepe'; // EmailJS Service ID
+const EMAILJS_TEMPLATE_ID = 'template_oblchjs'; // EmailJS Template ID
 
 // Global database instance
 let db = null;
@@ -745,16 +748,13 @@ class TodoApp {
             if (task.reminderTimestamp <= now) {
                 console.log('Reminder due for task:', task.text);
 
-                // ONLY send browser notifications from the frontend
-                // Email reminders are handled by the scheduled Netlify Function
                 if (task.reminderType === 'notification') {
                     await this.sendNotificationReminder(task);
-                    // Mark notification reminder as sent
                     tasksToUpdate.push(task.id);
                 } else if (task.reminderType === 'email') {
-                    // Email reminders are handled by the backend scheduled function
-                    // DON'T mark as sent here - let backend do it after actually sending
-                    console.log('Email reminder will be sent by scheduled function for:', task.text);
+                    // Send email reminder using EmailJS
+                    await this.sendEmailReminder(task);
+                    tasksToUpdate.push(task.id);
                 }
             }
         }
@@ -814,6 +814,53 @@ class TodoApp {
         }
     }
 
+    async sendEmailReminder(task) {
+        // Check if EmailJS is configured
+        if (EMAILJS_PUBLIC_KEY === 'YOUR_EMAILJS_PUBLIC_KEY' ||
+            EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID' ||
+            EMAILJS_TEMPLATE_ID === 'YOUR_TEMPLATE_ID') {
+            console.warn('EmailJS not configured. Please set up EmailJS credentials.');
+            return;
+        }
+
+        // Initialize EmailJS if not already done
+        if (typeof emailjs !== 'undefined' && !emailjs._initialized) {
+            emailjs.init(EMAILJS_PUBLIC_KEY);
+            emailjs._initialized = true;
+        }
+
+        try {
+            const dueDate = new Date(task.dueDate);
+            const dueDateStr = dueDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            // Prepare email template parameters
+            const templateParams = {
+                to_email: this.user.email,
+                to_name: this.user.email.split('@')[0],
+                task_name: task.text,
+                due_date: dueDateStr,
+                due_time: task.dueTime || '',
+                reminder_timing: task.reminderTiming || '',
+                app_url: window.location.origin
+            };
+
+            // Send email using EmailJS
+            const response = await emailjs.send(
+                EMAILJS_SERVICE_ID,
+                EMAILJS_TEMPLATE_ID,
+                templateParams
+            );
+
+            console.log('Email reminder sent successfully:', response);
+        } catch (error) {
+            console.error('Failed to send email reminder:', error);
+        }
+    }
 
     handleDateChange(e, context) {
         const dateValue = e.target.value;
