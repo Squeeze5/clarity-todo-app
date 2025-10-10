@@ -12,6 +12,7 @@ node_modules/
 *.swo
 *~
 .DS_Store
+google3c7ef37639c7a22b.html
 
 # Build outputs
 dist/
