@@ -1,6 +1,19 @@
 // Netlify Function to send reminder emails
 // This function will be available at /.netlify/functions/send-reminder
 
+// Security: HTML escaping helper to prevent XSS in emails
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
 exports.handler = async (event, context) => {
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
@@ -134,7 +147,7 @@ exports.handler = async (event, context) => {
           <p>This is a reminder about your upcoming task:</p>
           
           <div class="task-name">
-            "${task_name}"
+            "${escapeHtml(task_name)}"
           </div>
           
           <div class="due-date">

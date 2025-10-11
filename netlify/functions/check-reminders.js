@@ -129,6 +129,19 @@ exports.handler = async (event, context) => {
   }
 };
 
+// Security: HTML escaping helper to prevent XSS in emails
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
 // Helper function to send email reminder
 async function sendEmailReminder(task) {
   try {
@@ -242,7 +255,7 @@ async function sendEmailReminder(task) {
           <p>This is a reminder about your upcoming task:</p>
 
           <div class="task-name">
-            "${task.text}"
+            "${escapeHtml(task.text)}"
           </div>
 
           <div class="due-date">

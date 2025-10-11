@@ -560,6 +560,14 @@ class TodoApp {
         this.applyStoredSettings();
     }
 
+    // Security: HTML escaping to prevent XSS attacks
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     applyStoredSettings() {
         // Apply saved settings from localStorage
         const settings = JSON.parse(localStorage.getItem('claritySettings') || '{}');
@@ -1036,7 +1044,7 @@ class TodoApp {
                 <div class="subtask-checkbox ${subtask.done ? 'checked' : ''}" onclick="todoApp.toggleTempSubtask('${subtask.id}', '${listId}', ${isEdit})">
                     ${subtask.done ? '<i class="fas fa-check"></i>' : ''}
                 </div>
-                <div class="subtask-text">${subtask.text}</div>
+                <div class="subtask-text">${this.escapeHtml(subtask.text)}</div>
                 <button class="subtask-delete" onclick="todoApp.deleteTempSubtask('${subtask.id}', '${listId}', ${isEdit})">
                     <i class="fas fa-times"></i>
                 </button>
@@ -1852,7 +1860,7 @@ class TodoApp {
                 return `
                     <span class="breadcrumb-item" onclick="todoApp.switchFolder('${f.id}')">
                         <i class="fas fa-folder"></i>
-                        ${f.text}
+                        ${this.escapeHtml(f.text)}
                     </span>
                     ${!isLast ? '<span class="breadcrumb-separator">/</span>' : ''}
                 `;
@@ -2557,7 +2565,7 @@ class TodoApp {
             folderEl.innerHTML = `
                 ${hasChildren ? `<button class="folder-expand-toggle ${this.expandedFolders.has(folder.id) ? 'expanded' : ''}" onclick="todoApp.toggleFolderExpansion('${folder.id}')"><i class="${expandIcon}"></i></button>` : ''}
                 <i class="${icon}"></i>
-                <span>${folder.text}</span>
+                <span>${this.escapeHtml(folder.text)}</span>
                 <span class="task-count">${taskCount}</span>
                 ${!folder.isDefault ? `
                     <div class="folder-actions">
@@ -2647,7 +2655,7 @@ class TodoApp {
                     <button class="section-collapse-btn" onclick="todoApp.toggleSectionExpansion('${section.id}')">
                         <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'}"></i>
                     </button>
-                    <h3 class="section-title">${section.text}</h3>
+                    <h3 class="section-title">${this.escapeHtml(section.text)}</h3>
                     <span class="section-count">${taskCount}</span>
                     <button class="section-delete-btn" onclick="todoApp.deleteSection('${section.id}')" title="Delete section">
                         <i class="fas fa-times"></i>
@@ -2719,7 +2727,7 @@ class TodoApp {
                     ${task.done ? '<i class="fas fa-check"></i>' : ''}
                 </div>
                 <div class="task-content-mini">
-                    <span class="task-text-mini">${task.text}</span>
+                    <span class="task-text-mini">${this.escapeHtml(task.text)}</span>
                     ${dueDateBadge}
                     ${priorityBadge}
                 </div>
@@ -2897,7 +2905,7 @@ class TodoApp {
                     ? task.description.substring(0, 100) + '...'
                     : task.description;
                 descriptionHTML = `
-                    <div class="task-description-preview">${preview}</div>
+                    <div class="task-description-preview">${this.escapeHtml(preview)}</div>
                 `;
             }
 
@@ -2933,7 +2941,7 @@ class TodoApp {
                 </div>
                 <div class="task-info">
                     <div class="task-text">
-                        ${task.text}${subtaskIndicatorHTML}${priorityHTML}
+                        ${this.escapeHtml(task.text)}${subtaskIndicatorHTML}${priorityHTML}
                     </div>
                     ${descriptionHTML}
                     ${dueDateHTML}
@@ -2966,7 +2974,7 @@ class TodoApp {
                         <div class="subtask-checkbox ${subtask.done ? 'checked' : ''}" onclick="todoApp.toggleSubtask('${subtask.id}', '${task.id}')">
                             ${subtask.done ? '<i class="fas fa-check"></i>' : ''}
                         </div>
-                        <div class="subtask-text">${subtask.text}</div>
+                        <div class="subtask-text">${this.escapeHtml(subtask.text)}</div>
                     `;
                     subtasksContainer.appendChild(subtaskEl);
                 });
