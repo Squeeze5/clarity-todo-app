@@ -1251,7 +1251,7 @@ class TodoApp {
         this.addProfileMenu();
     }
 
-    addProfileMenu() {
+    async addProfileMenu() {
         const sidebarUserSection = document.getElementById('sidebar-user-section');
 
         if (!sidebarUserSection) {
@@ -1263,8 +1263,12 @@ class TodoApp {
         const userEmail = this.userEmail || 'User';
         const userInitial = userEmail.charAt(0).toUpperCase();
 
-        // Get first name from email
-        const userName = userEmail.split('@')[0].charAt(0).toUpperCase() + userEmail.split('@')[0].slice(1);
+        // Load nickname from database
+        await this.loadNicknameForProfile();
+
+        // Get display name (nickname or email-based name)
+        const displayName = this.userNickname || userEmail.split('@')[0];
+        const userName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
 
         // Create profile button
         const profileBtn = document.createElement('button');
@@ -1406,15 +1410,31 @@ class TodoApp {
         document.getElementById('settings-theme')?.addEventListener('change', (e) => {
             this.applyThemeSetting(e.target.value);
         });
+
+        // Change Nickname button
+        document.getElementById('change-nickname-btn')?.addEventListener('click', () => {
+            this.changeNickname();
+        });
+
+        // Reset Password button
+        document.getElementById('reset-password-btn')?.addEventListener('click', () => {
+            this.showResetPasswordModal();
+        });
+
+        // Reset Password Modal listeners
+        this.setupResetPasswordListeners();
     }
 
-    loadSettings() {
+    async loadSettings() {
         // Load settings from localStorage
         const settings = JSON.parse(localStorage.getItem('claritySettings') || '{}');
 
         // Account info
         document.getElementById('settings-email').value = this.userEmail || '';
         document.getElementById('settings-user-id').value = this.userId || '';
+
+        // Load nickname from database
+        await this.loadNickname();
 
         // General settings
         document.getElementById('settings-default-priority').value = settings.defaultPriority || '4';
@@ -1532,6 +1552,317 @@ class TodoApp {
 
         URL.revokeObjectURL(url);
         this.showNotification('Data exported successfully!');
+    }
+
+    // Nickname Management
+    async loadNicknameForProfile() {
+        try {
+            const result = await new Promise((resolve, reject) => {
+                let unsubscribe;
+                unsubscribe = db.subscribeQuery({
+                    userPasswords: {
+                        $: {
+                            where: {
+                                userId: this.userId
+                            }
+                        }
+                    }
+                }, (resp) => {
+                    if (unsubscribe) unsubscribe();
+                    if (resp.error) {
+                        reject(resp.error);
+                    } else {
+                        resolve(resp.data);
+                    }
+                });
+            });
+
+            const userPassword = result?.userPasswords?.[0];
+            this.userNickname = userPassword?.nickname || '';
+        } catch (error) {
+            console.error('Error loading nickname for profile:', error);
+            this.userNickname = '';
+        }
+    }
+
+    async loadNickname() {
+        try {
+            const result = await new Promise((resolve, reject) => {
+                let unsubscribe;
+                unsubscribe = db.subscribeQuery({
+                    userPasswords: {
+                        $: {
+                            where: {
+                                userId: this.userId
+                            }
+                        }
+                    }
+                }, (resp) => {
+                    if (unsubscribe) unsubscribe();
+                    if (resp.error) {
+                        reject(resp.error);
+                    } else {
+                        resolve(resp.data);
+                    }
+                });
+            });
+
+            const userPassword = result?.userPasswords?.[0];
+            const nickname = userPassword?.nickname || '';
+            document.getElementById('settings-nickname').value = nickname;
+
+            // Store in instance for use in sidebar
+            this.userNickname = nickname;
+        } catch (error) {
+            console.error('Error loading nickname:', error);
+        }
+    }
+
+    async changeNickname() {
+        const nicknameInput = document.getElementById('settings-nickname');
+        const newNickname = nicknameInput.value.trim();
+
+        if (!newNickname) {
+            alert('Please enter a nickname');
+            return;
+        }
+
+        if (newNickname.length > 50) {
+            alert('Nickname must be 50 characters or less');
+            return;
+        }
+
+        try {
+            // Get the userPassword record
+            const result = await new Promise((resolve, reject) => {
+                let unsubscribe;
+                unsubscribe = db.subscribeQuery({
+                    userPasswords: {
+                        $: {
+                            where: {
+                                userId: this.userId
+                            }
+                        }
+                    }
+                }, (resp) => {
+                    if (unsubscribe) unsubscribe();
+                    if (resp.error) {
+                        reject(resp.error);
+                    } else {
+                        resolve(resp.data);
+                    }
+                });
+            });
+
+            const userPassword = result?.userPasswords?.[0];
+
+            if (!userPassword) {
+                alert('User password record not found');
+                return;
+            }
+
+            // Update nickname
+            await db.transact([
+                db.tx.userPasswords[userPassword.id].update({
+                    nickname: newNickname,
+                    updatedAt: Date.now()
+                })
+            ]);
+
+            this.userNickname = newNickname;
+            this.showNotification('Nickname updated successfully!');
+
+            // Update sidebar display
+            this.updateProfileDisplay();
+        } catch (error) {
+            console.error('Error changing nickname:', error);
+            alert('Failed to update nickname. Please try again.');
+        }
+    }
+
+    updateProfileDisplay() {
+        // Update the sidebar profile button with new nickname
+        const displayName = this.userNickname || this.userEmail.split('@')[0];
+        const formattedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+
+        const profileNameEl = document.querySelector('.sidebar-profile-name');
+        if (profileNameEl) {
+            profileNameEl.textContent = formattedName;
+        }
+    }
+
+    // Password Reset
+    setupResetPasswordListeners() {
+        // Reset Password Modal
+        document.getElementById('reset-password-modal-close')?.addEventListener('click', () => {
+            this.hideResetPasswordModal();
+        });
+
+        document.getElementById('reset-password-cancel-btn')?.addEventListener('click', () => {
+            this.hideResetPasswordModal();
+        });
+
+        document.getElementById('reset-password-submit-btn')?.addEventListener('click', () => {
+            this.submitPasswordReset();
+        });
+
+        // Verify Password Reset Modal
+        document.getElementById('verify-password-reset-modal-close')?.addEventListener('click', () => {
+            this.hideVerifyPasswordModal();
+        });
+
+        document.getElementById('verify-password-cancel-btn')?.addEventListener('click', () => {
+            this.hideVerifyPasswordModal();
+        });
+
+        document.getElementById('verify-password-submit-btn')?.addEventListener('click', () => {
+            this.verifyAndResetPassword();
+        });
+    }
+
+    showResetPasswordModal() {
+        // Hide settings modal
+        this.hideSettingsModal();
+
+        // Show reset password modal
+        const modal = document.getElementById('reset-password-modal');
+        modal?.classList.add('active');
+
+        // Clear inputs
+        document.getElementById('reset-new-password').value = '';
+        document.getElementById('reset-confirm-password').value = '';
+        document.getElementById('reset-password-error').style.display = 'none';
+    }
+
+    hideResetPasswordModal() {
+        document.getElementById('reset-password-modal')?.classList.remove('active');
+    }
+
+    hideVerifyPasswordModal() {
+        document.getElementById('verify-password-reset-modal')?.classList.remove('active');
+    }
+
+    async submitPasswordReset() {
+        const newPassword = document.getElementById('reset-new-password').value;
+        const confirmPassword = document.getElementById('reset-confirm-password').value;
+        const errorEl = document.getElementById('reset-password-error');
+
+        // Validation
+        if (!newPassword || !confirmPassword) {
+            errorEl.textContent = 'Please fill in all fields';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            errorEl.textContent = 'Password must be at least 6 characters';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            errorEl.textContent = 'Passwords do not match';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            // Send magic code
+            await db.auth.sendMagicCode({ email: this.userEmail });
+
+            // Store new password temporarily
+            this.tempNewPassword = newPassword;
+
+            // Hide reset password modal and show verification modal
+            this.hideResetPasswordModal();
+
+            const verifyModal = document.getElementById('verify-password-reset-modal');
+            verifyModal?.classList.add('active');
+
+            document.getElementById('verify-password-code').value = '';
+            document.getElementById('verify-password-error').style.display = 'none';
+
+            this.showNotification('Verification code sent to your email!');
+        } catch (error) {
+            console.error('Error sending magic code:', error);
+            errorEl.textContent = 'Failed to send verification code. Please try again.';
+            errorEl.style.display = 'block';
+        }
+    }
+
+    async verifyAndResetPassword() {
+        const code = document.getElementById('verify-password-code').value;
+        const errorEl = document.getElementById('verify-password-error');
+
+        if (!code || code.length !== 6) {
+            errorEl.textContent = 'Please enter the 6-digit code';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            // Verify the magic code (this confirms the user's identity)
+            await db.auth.signInWithMagicCode({ email: this.userEmail, code });
+
+            // Hash the new password
+            const hashedPassword = await PasswordUtils.hashPassword(this.tempNewPassword);
+
+            // Get the userPassword record
+            const result = await new Promise((resolve, reject) => {
+                let unsubscribe;
+                unsubscribe = db.subscribeQuery({
+                    userPasswords: {
+                        $: {
+                            where: {
+                                userId: this.userId
+                            }
+                        }
+                    }
+                }, (resp) => {
+                    if (unsubscribe) unsubscribe();
+                    if (resp.error) {
+                        reject(resp.error);
+                    } else {
+                        resolve(resp.data);
+                    }
+                });
+            });
+
+            const userPassword = result?.userPasswords?.[0];
+
+            if (!userPassword) {
+                errorEl.textContent = 'User password record not found';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            // Update password in database
+            await db.transact([
+                db.tx.userPasswords[userPassword.id].update({
+                    passwordHash: hashedPassword,
+                    updatedAt: Date.now()
+                })
+            ]);
+
+            // Clear temp password
+            this.tempNewPassword = null;
+
+            // Hide verification modal
+            this.hideVerifyPasswordModal();
+
+            // Show success message
+            this.showNotification('Password reset successfully!');
+
+            // Show settings modal again
+            setTimeout(() => {
+                this.showSettingsModal();
+            }, 500);
+
+        } catch (error) {
+            console.error('Error verifying code or updating password:', error);
+            errorEl.textContent = 'Invalid verification code or update failed. Please try again.';
+            errorEl.style.display = 'block';
+        }
     }
 
     showNotification(message) {

@@ -398,9 +398,31 @@
                         </div>
 
                         <div class="settings-group">
+                            <label class="settings-label">Nickname</label>
+                            <div style="display: flex; gap: 8px; align-items: flex-start;">
+                                <input type="text" id="settings-nickname" class="settings-input" placeholder="Enter your nickname" maxlength="50">
+                                <button class="btn btn-secondary" id="change-nickname-btn">
+                                    <i class="fas fa-edit"></i> Change
+                                </button>
+                            </div>
+                            <p class="settings-help">Your display name shown in the sidebar</p>
+                        </div>
+
+                        <div class="settings-group">
                             <label class="settings-label">User ID</label>
                             <input type="text" id="settings-user-id" class="settings-input" readonly>
                             <p class="settings-help">Your unique user identifier</p>
+                        </div>
+
+                        <div class="settings-divider"></div>
+
+                        <h4 class="settings-section-title">Security</h4>
+
+                        <div class="settings-group">
+                            <button class="btn btn-secondary" id="reset-password-btn">
+                                <i class="fas fa-key"></i> Reset Password
+                            </button>
+                            <p class="settings-help">Change your account password</p>
                         </div>
 
                         <div class="settings-divider"></div>
@@ -544,6 +566,62 @@
             <div class="modal-footer">
                 <button class="btn btn-primary" id="save-settings-btn">Save Changes</button>
                 <button class="btn btn-secondary" id="cancel-settings-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="modal" id="reset-password-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Reset Password</h3>
+                <button class="modal-close" id="reset-password-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; color: var(--text-secondary); font-size: 13px;">
+                    Enter your new password below. You'll receive a magic code via email to verify this change.
+                </p>
+                <div class="settings-group">
+                    <label class="settings-label">New Password</label>
+                    <input type="password" id="reset-new-password" class="settings-input" placeholder="Enter new password" minlength="6">
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">Confirm New Password</label>
+                    <input type="password" id="reset-confirm-password" class="settings-input" placeholder="Confirm new password">
+                </div>
+                <div id="reset-password-error" class="auth-error" style="display: none; margin-top: 12px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="reset-password-submit-btn">Send Verification Code</button>
+                <button class="btn btn-secondary" id="reset-password-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verify Password Reset Modal -->
+    <div class="modal" id="verify-password-reset-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Verify Password Reset</h3>
+                <button class="modal-close" id="verify-password-reset-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; color: var(--text-secondary); font-size: 13px;">
+                    We've sent a 6-digit verification code to your email. Please enter it below to complete the password reset.
+                </p>
+                <div class="settings-group">
+                    <label class="settings-label">Verification Code</label>
+                    <input type="text" id="verify-password-code" class="settings-input" placeholder="Enter 6-digit code" maxlength="6">
+                </div>
+                <div id="verify-password-error" class="auth-error" style="display: none; margin-top: 12px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="verify-password-submit-btn">Verify & Reset Password</button>
+                <button class="btn btn-secondary" id="verify-password-cancel-btn">Cancel</button>
             </div>
         </div>
     </div>

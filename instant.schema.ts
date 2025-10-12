@@ -53,6 +53,7 @@ const _schema = i.schema({
       userId: i.string().unique().indexed(), // user ID
       email: i.string().indexed(), // email for lookup
       passwordHash: i.string(), // bcrypt hashed password
+      nickname: i.string().optional(), // user's custom display name
       createdAt: i.number().indexed(), // when password was set
       updatedAt: i.number().indexed(), // when password was last changed
     }),
