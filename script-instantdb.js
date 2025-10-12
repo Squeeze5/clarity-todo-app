@@ -1252,24 +1252,31 @@ class TodoApp {
     }
 
     addProfileMenu() {
-        const headerActions = document.querySelector('.header-actions');
+        const sidebarUserSection = document.getElementById('sidebar-user-section');
 
-        // Create profile menu container
-        const profileContainer = document.createElement('div');
-        profileContainer.className = 'profile-menu-container';
-        profileContainer.id = 'profile-menu-container';
-
-        // Create profile button
-        const profileBtn = document.createElement('button');
-        profileBtn.className = 'profile-button';
-        profileBtn.id = 'profile-button';
-        profileBtn.title = 'Profile';
+        if (!sidebarUserSection) {
+            console.error('Sidebar user section not found');
+            return;
+        }
 
         // Get user email or default icon
         const userEmail = this.userEmail || 'User';
         const userInitial = userEmail.charAt(0).toUpperCase();
 
-        profileBtn.innerHTML = `<div class="profile-avatar">${userInitial}</div>`;
+        // Get first name from email
+        const userName = userEmail.split('@')[0].charAt(0).toUpperCase() + userEmail.split('@')[0].slice(1);
+
+        // Create profile button
+        const profileBtn = document.createElement('button');
+        profileBtn.className = 'sidebar-profile-button';
+        profileBtn.id = 'sidebar-profile-button';
+        profileBtn.innerHTML = `
+            <div class="sidebar-profile-avatar">${userInitial}</div>
+            <div class="sidebar-profile-info">
+                <div class="sidebar-profile-name">${userName}</div>
+            </div>
+            <i class="fas fa-chevron-down sidebar-profile-chevron"></i>
+        `;
 
         // Create dropdown menu
         const dropdown = document.createElement('div');
@@ -1282,32 +1289,25 @@ class TodoApp {
                     <div class="profile-email">${userEmail}</div>
                 </div>
             </div>
-            <div class="profile-dropdown-divider"></div>
             <button class="profile-dropdown-item" id="profile-settings-btn">
                 <i class="fas fa-cog"></i>
                 <span>Settings</span>
             </button>
-            <button class="profile-dropdown-item" id="profile-activity-btn">
-                <i class="fas fa-history"></i>
-                <span>Activity Log</span>
-            </button>
-            <div class="profile-dropdown-divider"></div>
             <button class="profile-dropdown-item" id="profile-signout-btn">
                 <i class="fas fa-sign-out-alt"></i>
                 <span>Sign Out</span>
             </button>
         `;
 
-        profileContainer.appendChild(profileBtn);
-        profileContainer.appendChild(dropdown);
-        headerActions.appendChild(profileContainer);
+        sidebarUserSection.appendChild(profileBtn);
+        sidebarUserSection.appendChild(dropdown);
 
         // Add event listeners
         this.setupProfileMenu();
     }
 
     setupProfileMenu() {
-        const profileBtn = document.getElementById('profile-button');
+        const profileBtn = document.getElementById('sidebar-profile-button');
         const dropdown = document.getElementById('profile-dropdown');
 
         // Toggle dropdown
@@ -1318,7 +1318,7 @@ class TodoApp {
 
         // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.profile-menu-container')) {
+            if (!e.target.closest('.sidebar-user-section')) {
                 dropdown?.classList.remove('active');
             }
         });
@@ -1327,12 +1327,6 @@ class TodoApp {
         document.getElementById('profile-settings-btn')?.addEventListener('click', () => {
             dropdown?.classList.remove('active');
             this.showSettingsModal();
-        });
-
-        // Activity log button
-        document.getElementById('profile-activity-btn')?.addEventListener('click', () => {
-            dropdown?.classList.remove('active');
-            this.showActivityLog();
         });
 
         // Sign out button
