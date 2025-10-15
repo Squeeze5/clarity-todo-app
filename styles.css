@@ -1472,24 +1472,44 @@ body {
 }
 
 /* PRIORITY COLORS */
-.task-priority[data-priority="1"] {
+.task-priority {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+    border: 1px solid;
+}
+
+.task-priority[data-priority="1"],
+.task-priority.priority-1 {
     color: #d32f2f;
     border-color: #d32f2f;
+    background: rgba(211, 47, 47, 0.08);
 }
 
-.task-priority[data-priority="2"] {
+.task-priority[data-priority="2"],
+.task-priority.priority-2 {
     color: #f57c00;
     border-color: #f57c00;
+    background: rgba(245, 124, 0, 0.08);
 }
 
-.task-priority[data-priority="3"] {
+.task-priority[data-priority="3"],
+.task-priority.priority-3 {
     color: #1976d2;
     border-color: #1976d2;
+    background: rgba(25, 118, 210, 0.08);
 }
 
-.task-priority[data-priority="4"] {
+.task-priority[data-priority="4"],
+.task-priority.priority-4 {
     color: var(--text-secondary);
     border-color: var(--text-tertiary);
+    background: rgba(117, 117, 117, 0.08);
 }
 
 /* EXPAND TASK VIEW */
@@ -1614,4 +1634,276 @@ body {
     font-size: 14px;
     line-height: 1.6;
     color: var(--text-primary);
+}
+
+/* Compact Mode Styles */
+body.compact-mode .task-item {
+    padding: 6px 12px;
+    margin-bottom: 4px;
+}
+
+body.compact-mode .task-content {
+    font-size: 12px;
+}
+
+body.compact-mode .task-area {
+    padding: 32px 24px;
+}
+
+body.compact-mode .section {
+    margin-bottom: 20px;
+}
+
+body.compact-mode .section-header h2 {
+    font-size: 11px;
+    margin-bottom: 8px;
+}
+
+body.compact-mode .folder-item {
+    padding: 6px 12px;
+    margin-bottom: 2px;
+}
+
+body.compact-mode .folder-name {
+    font-size: 12px;
+}
+
+body.compact-mode .add-task-container {
+    padding: 6px 12px;
+}
+
+body.compact-mode .add-task-input {
+    font-size: 12px;
+    padding: 6px 8px;
+}
+
+body.compact-mode .add-task-btn,
+body.compact-mode .cancel-task-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+}
+
+body.compact-mode .modal-content {
+    padding: 20px;
+}
+
+body.compact-mode .modal-header h2 {
+    font-size: 16px;
+}
+
+body.compact-mode .form-group {
+    margin-bottom: 12px;
+}
+
+body.compact-mode .form-label {
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+body.compact-mode .form-input,
+body.compact-mode .form-select,
+body.compact-mode .form-textarea {
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+/* Time badge styling */
+.time-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-left: 8px;
+    font-weight: 500;
+}
+
+/* THEMES GALLERY */
+.themes-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.theme-card {
+    position: relative;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--bg-primary);
+}
+
+.theme-card:hover {
+    border-color: var(--text-tertiary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-md);
+}
+
+.theme-card.selected {
+    border-color: var(--accent-red);
+    border-width: 3px;
+}
+
+.theme-card.add-theme {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    border-style: dashed;
+    background: var(--bg-secondary);
+}
+
+.theme-card.add-theme:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-red);
+}
+
+.theme-card.add-theme i {
+    font-size: 32px;
+    color: var(--text-tertiary);
+}
+
+.theme-card.add-theme:hover i {
+    color: var(--accent-red);
+}
+
+.theme-preview {
+    height: 100px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-preview-header {
+    height: 30px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    gap: 6px;
+}
+
+.theme-preview-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.theme-preview-content {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+}
+
+.theme-preview-sidebar {
+    width: 50px;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+}
+
+.theme-preview-sidebar-item {
+    height: 6px;
+    border-radius: 2px;
+    opacity: 0.7;
+}
+
+.theme-preview-main {
+    flex: 1;
+    border-radius: 4px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.theme-preview-task {
+    height: 12px;
+    border-radius: 2px;
+    opacity: 0.8;
+}
+
+.theme-info {
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--border-color);
+}
+
+.theme-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.theme-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.theme-card:hover .theme-actions {
+    opacity: 1;
+}
+
+.theme-action-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.theme-action-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+.theme-action-btn.delete:hover {
+    color: var(--accent-red);
+}
+
+.theme-checkbox {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.theme-card:hover .theme-checkbox,
+.theme-card.selected .theme-checkbox {
+    opacity: 1;
+}
+
+.theme-card.selected .theme-checkbox {
+    background: var(--accent-red);
+    border-color: var(--accent-red);
+}
+
+.theme-checkbox i {
+    color: white;
+    font-size: 10px;
 }

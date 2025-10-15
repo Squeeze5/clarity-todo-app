@@ -194,6 +194,12 @@
                         <div class="color-option" data-color="#ef4444" style="background-color: #ef4444;"></div>
                         <div class="color-option" data-color="#8b5cf6" style="background-color: #8b5cf6;"></div>
                         <div class="color-option" data-color="#06b6d4" style="background-color: #06b6d4;"></div>
+                        <div class="color-option" data-color="#ec4899" style="background-color: #ec4899;"></div>
+                        <div class="color-option" data-color="#14b8a6" style="background-color: #14b8a6;"></div>
+                        <div class="color-option" data-color="#f97316" style="background-color: #f97316;"></div>
+                        <div class="color-option" data-color="#6366f1" style="background-color: #6366f1;"></div>
+                        <div class="color-option" data-color="#84cc16" style="background-color: #84cc16;"></div>
+                        <div class="color-option" data-color="#eab308" style="background-color: #eab308;"></div>
                     </div>
                 </div>
             </div>
@@ -528,17 +534,14 @@
 
                     <!-- Appearance Tab -->
                     <div class="settings-tab" id="settings-tab-appearance">
-                        <h4 class="settings-section-title">Theme</h4>
+                        <h4 class="settings-section-title">Your Themes</h4>
+                        <p class="settings-help" style="margin-bottom: 16px;">Choose a theme or create your own custom theme</p>
 
-                        <div class="settings-group">
-                            <label class="settings-label">Color Theme</label>
-                            <select id="settings-theme" class="settings-select">
-                                <option value="light">Light</option>
-                                <option value="dark">Dark</option>
-                                <option value="auto">Auto (System)</option>
-                            </select>
-                            <p class="settings-help">Choose your preferred color theme</p>
+                        <div class="themes-gallery" id="themes-gallery">
+                            <!-- Themes will be dynamically rendered here -->
                         </div>
+
+                        <input type="file" id="theme-file-input" accept=".css" style="display: none;">
 
                         <div class="settings-divider"></div>
 
@@ -550,7 +553,9 @@
                                 <option value="small">Small</option>
                                 <option value="medium" selected>Medium</option>
                                 <option value="large">Large</option>
+                                <option value="xlarge">Extra Large</option>
                             </select>
+                            <p class="settings-help">Adjust text size for better readability</p>
                         </div>
 
                         <div class="settings-group">
@@ -559,6 +564,80 @@
                                 <span>Compact mode</span>
                             </label>
                             <p class="settings-help">Display more tasks on screen with reduced spacing</p>
+                        </div>
+
+                        <div class="settings-divider"></div>
+
+                        <h4 class="settings-section-title">Task Display</h4>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Default Task Sorting</label>
+                            <select id="settings-task-sort" class="settings-select">
+                                <option value="manual">Manual (drag and drop)</option>
+                                <option value="dueDate">Due date</option>
+                                <option value="priority">Priority</option>
+                                <option value="name">Name (A-Z)</option>
+                                <option value="created">Date created</option>
+                            </select>
+                            <p class="settings-help">How tasks should be ordered by default</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-checkbox-label">
+                                <input type="checkbox" id="settings-show-priority-colors" class="settings-checkbox" checked>
+                                <span>Show priority colors</span>
+                            </label>
+                            <p class="settings-help">Color-code tasks based on their priority level</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-checkbox-label">
+                                <input type="checkbox" id="settings-show-subtask-count" class="settings-checkbox" checked>
+                                <span>Show subtask count</span>
+                            </label>
+                            <p class="settings-help">Display subtask completion indicator (e.g., "3/5")</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-checkbox-label">
+                                <input type="checkbox" id="settings-show-descriptions" class="settings-checkbox" checked>
+                                <span>Show task descriptions</span>
+                            </label>
+                            <p class="settings-help">Display task descriptions in task list</p>
+                        </div>
+
+                        <div class="settings-divider"></div>
+
+                        <h4 class="settings-section-title">Date & Time</h4>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Date Format</label>
+                            <select id="settings-date-format" class="settings-select">
+                                <option value="mdy">MM/DD/YYYY (US)</option>
+                                <option value="dmy">DD/MM/YYYY (UK)</option>
+                                <option value="ymd">YYYY-MM-DD (ISO)</option>
+                                <option value="relative">Relative (Today, Tomorrow)</option>
+                            </select>
+                            <p class="settings-help">How dates are displayed throughout the app</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Time Format</label>
+                            <select id="settings-time-format" class="settings-select">
+                                <option value="12h">12-hour (AM/PM)</option>
+                                <option value="24h">24-hour</option>
+                            </select>
+                            <p class="settings-help">Time display format</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <label class="settings-label">Week Starts On</label>
+                            <select id="settings-week-start" class="settings-select">
+                                <option value="0">Sunday</option>
+                                <option value="1">Monday</option>
+                                <option value="6">Saturday</option>
+                            </select>
+                            <p class="settings-help">First day of the week for calendar views</p>
                         </div>
                     </div>
                 </div>

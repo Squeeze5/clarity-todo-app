@@ -558,6 +558,7 @@ class TodoApp {
         this.setupReactiveQueries();
         this.initializeReminders();
         this.applyStoredSettings();
+        this.initializeThemes();
     }
 
     // Security: HTML escaping to prevent XSS attacks
@@ -566,6 +567,68 @@ class TodoApp {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    formatDate(date) {
+        const settings = JSON.parse(localStorage.getItem('claritySettings') || '{}');
+        const format = settings.dateFormat || 'mdy';
+        const d = new Date(date);
+
+        if (format === 'relative') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            const dateOnly = new Date(d);
+            dateOnly.setHours(0, 0, 0, 0);
+
+            if (dateOnly.getTime() === today.getTime()) {
+                return 'Today';
+            } else if (dateOnly.getTime() === tomorrow.getTime()) {
+                return 'Tomorrow';
+            } else if (dateOnly.getTime() === yesterday.getTime()) {
+                return 'Yesterday';
+            }
+        }
+
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+
+        switch (format) {
+            case 'mdy':
+                return `${month}/${day}/${year}`;
+            case 'dmy':
+                return `${day}/${month}/${year}`;
+            case 'ymd':
+                return `${year}-${month}-${day}`;
+            case 'relative':
+                // Fall back to mdy for dates not today/tomorrow/yesterday
+                return `${month}/${day}/${year}`;
+            default:
+                return `${month}/${day}/${year}`;
+        }
+    }
+
+    formatTime(time) {
+        if (!time) return '';
+        const settings = JSON.parse(localStorage.getItem('claritySettings') || '{}');
+        const format = settings.timeFormat || '12h';
+
+        // time is in HH:MM format (24-hour)
+        const [hours, minutes] = time.split(':').map(Number);
+
+        if (format === '24h') {
+            return time;
+        }
+
+        // Convert to 12-hour format
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
     }
 
     applyStoredSettings() {
@@ -1449,10 +1512,20 @@ class TodoApp {
         document.getElementById('settings-daily-summary-time').value = settings.dailySummaryTime || '08:00';
 
         // Appearance settings
-        const currentTheme = localStorage.getItem('theme') || 'light';
-        document.getElementById('settings-theme').value = currentTheme;
+        // Theme is now managed by the themes gallery (no settings-theme element)
         document.getElementById('settings-font-size').value = settings.fontSize || 'medium';
         document.getElementById('settings-compact-mode').checked = settings.compactMode || false;
+
+        // Task display settings
+        document.getElementById('settings-task-sort').value = settings.taskSort || 'manual';
+        document.getElementById('settings-show-priority-colors').checked = settings.showPriorityColors !== false;
+        document.getElementById('settings-show-subtask-count').checked = settings.showSubtaskCount !== false;
+        document.getElementById('settings-show-descriptions').checked = settings.showDescriptions !== false;
+
+        // Date & time settings
+        document.getElementById('settings-date-format').value = settings.dateFormat || 'mdy';
+        document.getElementById('settings-time-format').value = settings.timeFormat || '12h';
+        document.getElementById('settings-week-start').value = settings.weekStart || '0';
     }
 
     saveSettings() {
@@ -1467,21 +1540,30 @@ class TodoApp {
             emailDailySummary: document.getElementById('settings-email-daily-summary').checked,
             dailySummaryTime: document.getElementById('settings-daily-summary-time').value,
             fontSize: document.getElementById('settings-font-size').value,
-            compactMode: document.getElementById('settings-compact-mode').checked
+            compactMode: document.getElementById('settings-compact-mode').checked,
+            taskSort: document.getElementById('settings-task-sort').value,
+            showPriorityColors: document.getElementById('settings-show-priority-colors').checked,
+            showSubtaskCount: document.getElementById('settings-show-subtask-count').checked,
+            showDescriptions: document.getElementById('settings-show-descriptions').checked,
+            dateFormat: document.getElementById('settings-date-format').value,
+            timeFormat: document.getElementById('settings-time-format').value,
+            weekStart: document.getElementById('settings-week-start').value
         };
 
         // Save to localStorage
         localStorage.setItem('claritySettings', JSON.stringify(settings));
 
-        // Apply theme setting
-        const theme = document.getElementById('settings-theme').value;
-        this.applyThemeSetting(theme);
+        // Theme is now managed separately by the themes gallery system
+        // No need to apply theme here as it's handled by selectTheme()
 
         // Apply font size
         this.applyFontSize(settings.fontSize);
 
         // Apply compact mode
         this.applyCompactMode(settings.compactMode);
+
+        // Re-render tasks to apply new settings
+        this.renderTasks();
 
         // Close modal
         this.hideSettingsModal();
@@ -1513,13 +1595,19 @@ class TodoApp {
         const root = document.documentElement;
         switch(size) {
             case 'small':
-                root.style.fontSize = '14px';
+                root.style.fontSize = '11px';
+                break;
+            case 'medium':
+                root.style.fontSize = '13px'; // Default Todoist size
                 break;
             case 'large':
-                root.style.fontSize = '18px';
+                root.style.fontSize = '15px';
+                break;
+            case 'xlarge':
+                root.style.fontSize = '17px';
                 break;
             default:
-                root.style.fontSize = '16px';
+                root.style.fontSize = '13px';
         }
     }
 
@@ -1529,6 +1617,361 @@ class TodoApp {
         } else {
             document.body.classList.remove('compact-mode');
         }
+    }
+
+    // Theme Management System
+    getDefaultThemes() {
+        return {
+            'clarity-light': {
+                name: 'Clarity Light',
+                isDefault: true,
+                variables: {
+                    '--bg-primary': '#ffffff',
+                    '--bg-secondary': '#fafafa',
+                    '--bg-tertiary': '#f5f5f5',
+                    '--text-primary': '#202020',
+                    '--text-secondary': '#808080',
+                    '--text-tertiary': '#b3b3b3',
+                    '--border-color': '#f0f0f0',
+                    '--border-dark': '#e0e0e0',
+                    '--shadow-sm': 'rgba(0, 0, 0, 0.06)',
+                    '--shadow-md': 'rgba(0, 0, 0, 0.12)',
+                    '--accent-red': '#db4c3f',
+                    '--accent-purple': '#a970ff',
+                    '--accent-green': '#4caf50',
+                    '--accent-blue': '#4073ff',
+                    '--hover-bg': '#f9f9f9',
+                    '--task-bg': '#ffffff',
+                    '--modal-backdrop': 'rgba(0, 0, 0, 0.3)'
+                }
+            },
+            'midnight': {
+                name: 'Midnight',
+                isDefault: true,
+                variables: {
+                    '--bg-primary': '#1f1f1f',
+                    '--bg-secondary': '#282828',
+                    '--bg-tertiary': '#333333',
+                    '--text-primary': '#ffffff',
+                    '--text-secondary': '#b3b3b3',
+                    '--text-tertiary': '#808080',
+                    '--border-color': '#2d2d2d',
+                    '--border-dark': '#3a3a3a',
+                    '--shadow-sm': 'rgba(0, 0, 0, 0.2)',
+                    '--shadow-md': 'rgba(0, 0, 0, 0.4)',
+                    '--accent-red': '#db4c3f',
+                    '--accent-purple': '#a970ff',
+                    '--accent-green': '#4caf50',
+                    '--accent-blue': '#4073ff',
+                    '--hover-bg': '#282828',
+                    '--task-bg': '#1f1f1f',
+                    '--modal-backdrop': 'rgba(0, 0, 0, 0.6)'
+                }
+            },
+            'ocean-breeze': {
+                name: 'Ocean Breeze',
+                isDefault: true,
+                variables: {
+                    '--bg-primary': '#f0f4f8',
+                    '--bg-secondary': '#e1e8ed',
+                    '--bg-tertiary': '#d3dce6',
+                    '--text-primary': '#1a202c',
+                    '--text-secondary': '#4a5568',
+                    '--text-tertiary': '#a0aec0',
+                    '--border-color': '#cbd5e0',
+                    '--border-dark': '#a0aec0',
+                    '--shadow-sm': 'rgba(66, 153, 225, 0.1)',
+                    '--shadow-md': 'rgba(66, 153, 225, 0.2)',
+                    '--accent-red': '#f56565',
+                    '--accent-purple': '#9f7aea',
+                    '--accent-green': '#48bb78',
+                    '--accent-blue': '#4299e1',
+                    '--hover-bg': '#edf2f7',
+                    '--task-bg': '#ffffff',
+                    '--modal-backdrop': 'rgba(45, 55, 72, 0.4)'
+                }
+            },
+            'sunset-glow': {
+                name: 'Sunset Glow',
+                isDefault: true,
+                variables: {
+                    '--bg-primary': '#fffaf0',
+                    '--bg-secondary': '#feebc8',
+                    '--bg-tertiary': '#fbd38d',
+                    '--text-primary': '#2d3748',
+                    '--text-secondary': '#4a5568',
+                    '--text-tertiary': '#a0aec0',
+                    '--border-color': '#fbd38d',
+                    '--border-dark': '#f6ad55',
+                    '--shadow-sm': 'rgba(237, 137, 54, 0.1)',
+                    '--shadow-md': 'rgba(237, 137, 54, 0.2)',
+                    '--accent-red': '#e53e3e',
+                    '--accent-purple': '#805ad5',
+                    '--accent-green': '#38a169',
+                    '--accent-blue': '#3182ce',
+                    '--hover-bg': '#fef5e7',
+                    '--task-bg': '#ffffff',
+                    '--modal-backdrop': 'rgba(113, 63, 18, 0.4)'
+                }
+            }
+        };
+    }
+
+    initializeThemes() {
+        const savedThemes = localStorage.getItem('customThemes');
+        const customThemes = savedThemes ? JSON.parse(savedThemes) : {};
+        const defaultThemes = this.getDefaultThemes();
+        this.themes = { ...defaultThemes, ...customThemes };
+
+        // Get current theme
+        this.currentTheme = localStorage.getItem('currentThemeName') || 'clarity-light';
+
+        // Render themes gallery
+        this.renderThemesGallery();
+
+        // Apply current theme
+        this.applyTheme(this.currentTheme);
+
+        // Setup theme file upload
+        const fileInput = document.getElementById('theme-file-input');
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => this.handleThemeUpload(e));
+        }
+    }
+
+    renderThemesGallery() {
+        const gallery = document.getElementById('themes-gallery');
+        if (!gallery) return;
+
+        gallery.innerHTML = '';
+
+        // Render all themes
+        Object.keys(this.themes).forEach(themeId => {
+            const theme = this.themes[themeId];
+            const card = this.createThemeCard(themeId, theme);
+            gallery.appendChild(card);
+        });
+
+        // Add "+" card for custom themes
+        const addCard = document.createElement('div');
+        addCard.className = 'theme-card add-theme';
+        addCard.innerHTML = '<i class="fas fa-plus"></i>';
+        addCard.addEventListener('click', () => {
+            document.getElementById('theme-file-input').click();
+        });
+        gallery.appendChild(addCard);
+    }
+
+    createThemeCard(themeId, theme) {
+        const card = document.createElement('div');
+        card.className = `theme-card ${this.currentTheme === themeId ? 'selected' : ''}`;
+        card.setAttribute('data-theme-id', themeId);
+
+        const variables = theme.variables;
+
+        card.innerHTML = `
+            <div class="theme-checkbox">
+                ${this.currentTheme === themeId ? '<i class="fas fa-check"></i>' : ''}
+            </div>
+            <div class="theme-preview" style="background: ${variables['--bg-secondary']};">
+                <div class="theme-preview-header" style="background: ${variables['--bg-primary']}; border-bottom: 1px solid ${variables['--border-color']};">
+                    <div class="theme-preview-dot" style="background: ${variables['--accent-red']};"></div>
+                    <div class="theme-preview-dot" style="background: ${variables['--accent-green']};"></div>
+                    <div class="theme-preview-dot" style="background: ${variables['--accent-blue']};"></div>
+                </div>
+                <div class="theme-preview-content">
+                    <div class="theme-preview-sidebar" style="background: ${variables['--bg-primary']}; border-right: 1px solid ${variables['--border-color']};">
+                        <div class="theme-preview-sidebar-item" style="background: ${variables['--text-tertiary']};"></div>
+                        <div class="theme-preview-sidebar-item" style="background: ${variables['--text-tertiary']};"></div>
+                        <div class="theme-preview-sidebar-item" style="background: ${variables['--text-tertiary']};"></div>
+                    </div>
+                    <div class="theme-preview-main" style="background: ${variables['--bg-primary']};">
+                        <div class="theme-preview-task" style="background: ${variables['--hover-bg']}; border: 1px solid ${variables['--border-color']};"></div>
+                        <div class="theme-preview-task" style="background: ${variables['--hover-bg']}; border: 1px solid ${variables['--border-color']};"></div>
+                        <div class="theme-preview-task" style="background: ${variables['--hover-bg']}; border: 1px solid ${variables['--border-color']};"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="theme-info">
+                <span class="theme-name">${this.escapeHtml(theme.name)}</span>
+                ${!theme.isDefault ? `
+                    <div class="theme-actions">
+                        <button class="theme-action-btn" onclick="todoApp.exportTheme('${themeId}')" title="Export theme">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="theme-action-btn delete" onclick="todoApp.deleteTheme('${themeId}')" title="Delete theme">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        card.addEventListener('click', (e) => {
+            // Don't select if clicking action buttons
+            if (e.target.closest('.theme-actions')) return;
+            this.selectTheme(themeId);
+        });
+
+        return card;
+    }
+
+    selectTheme(themeId) {
+        if (!this.themes[themeId]) return;
+
+        this.currentTheme = themeId;
+        localStorage.setItem('currentThemeName', themeId);
+
+        // Apply theme
+        this.applyTheme(themeId);
+
+        // Update gallery selection
+        this.renderThemesGallery();
+    }
+
+    applyTheme(themeId) {
+        const theme = this.themes[themeId];
+        if (!theme) return;
+
+        const root = document.documentElement;
+        Object.keys(theme.variables).forEach(varName => {
+            root.style.setProperty(varName, theme.variables[varName]);
+        });
+
+        // Update theme icon based on brightness
+        this.updateThemeIconBasedOnBrightness(theme.variables);
+    }
+
+    updateThemeIconBasedOnBrightness(variables) {
+        const bgColor = variables['--bg-primary'];
+        // Simple brightness check - if background is dark, show sun icon
+        const isDark = this.isColorDark(bgColor);
+        const themeIcon = document.getElementById('theme-icon');
+        if (themeIcon) {
+            themeIcon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+        }
+    }
+
+    isColorDark(hexColor) {
+        // Convert hex to RGB and calculate brightness
+        const hex = hexColor.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        return brightness < 128;
+    }
+
+    async handleThemeUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            const cssText = await file.text();
+            const themeName = file.name.replace('.css', '');
+            const variables = this.extractCSSVariables(cssText);
+
+            if (Object.keys(variables).length === 0) {
+                alert('No CSS variables found in the file. Please upload a valid theme file with CSS variables (--var-name format).');
+                return;
+            }
+
+            // Generate unique ID
+            const themeId = 'custom_' + Date.now();
+
+            // Add to themes
+            this.themes[themeId] = {
+                name: themeName,
+                isDefault: false,
+                variables: variables
+            };
+
+            // Save custom themes
+            this.saveCustomThemes();
+
+            // Re-render gallery
+            this.renderThemesGallery();
+
+            // Select the new theme
+            this.selectTheme(themeId);
+
+            this.showNotification(`Theme "${themeName}" imported successfully!`);
+        } catch (error) {
+            console.error('Error uploading theme:', error);
+            alert('Error uploading theme. Please try again.');
+        }
+
+        // Reset file input
+        event.target.value = '';
+    }
+
+    extractCSSVariables(cssText) {
+        const variables = {};
+        const varRegex = /--([\w-]+)\s*:\s*([^;]+);/g;
+        let match;
+
+        while ((match = varRegex.exec(cssText)) !== null) {
+            variables[`--${match[1]}`] = match[2].trim();
+        }
+
+        return variables;
+    }
+
+    saveCustomThemes() {
+        const customThemes = {};
+        Object.keys(this.themes).forEach(id => {
+            if (!this.themes[id].isDefault) {
+                customThemes[id] = this.themes[id];
+            }
+        });
+        localStorage.setItem('customThemes', JSON.stringify(customThemes));
+    }
+
+    async deleteTheme(themeId) {
+        if (this.themes[themeId]?.isDefault) {
+            alert('Cannot delete default themes.');
+            return;
+        }
+
+        const confirmed = await this.showConfirmation('Delete Theme', `Are you sure you want to delete "${this.themes[themeId].name}"?`);
+        if (!confirmed) return;
+
+        // If current theme, switch to default
+        if (this.currentTheme === themeId) {
+            this.selectTheme('clarity-light');
+        }
+
+        // Delete theme
+        delete this.themes[themeId];
+        this.saveCustomThemes();
+
+        // Re-render
+        this.renderThemesGallery();
+
+        this.showNotification('Theme deleted successfully');
+    }
+
+    exportTheme(themeId) {
+        const theme = this.themes[themeId];
+        if (!theme) return;
+
+        // Generate CSS file content
+        let cssContent = `/* ${theme.name} Theme for Clarity Todo */\n:root {\n`;
+        Object.keys(theme.variables).forEach(varName => {
+            cssContent += `    ${varName}: ${theme.variables[varName]};\n`;
+        });
+        cssContent += '}\n';
+
+        // Download file
+        const blob = new Blob([cssContent], { type: 'text/css' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${theme.name.toLowerCase().replace(/\s+/g, '-')}-theme.css`;
+        link.click();
+        URL.revokeObjectURL(url);
+
+        this.showNotification('Theme exported successfully!');
     }
 
     exportData() {
@@ -3098,25 +3541,50 @@ class TodoApp {
                 task.text.toLowerCase().includes(this.searchQuery)
             );
         }
-        
-        // Sort tasks: overdue first, then by due date, then by creation date
+
+        // Get sort preference from settings
+        const settings = JSON.parse(localStorage.getItem('claritySettings') || '{}');
+        const sortMethod = settings.taskSort || 'manual';
+
+        // Sort tasks based on user preference
         filteredTasks.sort((a, b) => {
-            const now = Date.now();
-            const aOverdue = a.dueDate && !a.done && a.dueDate < now;
-            const bOverdue = b.dueDate && !b.done && b.dueDate < now;
-            
-            // Overdue tasks come first
-            if (aOverdue && !bOverdue) return -1;
-            if (!aOverdue && bOverdue) return 1;
-            
-            // Then sort by due date (earliest first)
-            if (a.dueDate && b.dueDate) {
-                return a.dueDate - b.dueDate;
+            if (sortMethod === 'dueDate') {
+                // Sort by due date
+                const now = Date.now();
+                const aOverdue = a.dueDate && !a.done && a.dueDate < now;
+                const bOverdue = b.dueDate && !b.done && b.dueDate < now;
+
+                // Overdue tasks come first
+                if (aOverdue && !bOverdue) return -1;
+                if (!aOverdue && bOverdue) return 1;
+
+                // Then sort by due date (earliest first)
+                if (a.dueDate && b.dueDate) {
+                    return a.dueDate - b.dueDate;
+                }
+                if (a.dueDate && !b.dueDate) return -1;
+                if (!a.dueDate && b.dueDate) return 1;
+
+                // Finally sort by creation date
+                return b.createdAt - a.createdAt;
+            } else if (sortMethod === 'priority') {
+                // Sort by priority (P1 highest, P4 lowest)
+                const aPriority = parseInt(a.priority) || 4;
+                const bPriority = parseInt(b.priority) || 4;
+                if (aPriority !== bPriority) {
+                    return aPriority - bPriority;
+                }
+                // Then by creation date
+                return b.createdAt - a.createdAt;
+            } else if (sortMethod === 'name') {
+                // Sort alphabetically by task name
+                return a.text.localeCompare(b.text);
+            } else if (sortMethod === 'created') {
+                // Sort by creation date (newest first)
+                return b.createdAt - a.createdAt;
             }
-            if (a.dueDate && !b.dueDate) return -1;
-            if (!a.dueDate && b.dueDate) return 1;
-            
-            // Finally sort by creation date
+
+            // Default: manual sorting (by creation date, newest first)
             return b.createdAt - a.createdAt;
         });
 
@@ -3148,19 +3616,15 @@ class TodoApp {
             let dueDateHTML = '';
             if (task.dueDate) {
                 const now = Date.now();
-                const dueDate = new Date(task.dueDate);
                 const isOverdue = !task.done && task.dueDate < now;
                 const isDueSoon = !task.done && !isOverdue && (task.dueDate - now) < 86400000; // Less than 24 hours
-                
-                const dateStr = dueDate.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric',
-                    year: dueDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-                });
-                
+
+                // Use custom date formatting
+                const dateStr = this.formatDate(task.dueDate);
+
                 let className = 'task-due-date';
                 let statusText = '';
-                
+
                 if (isOverdue) {
                     className += ' overdue';
                     statusText = ' (Overdue)';
@@ -3168,11 +3632,12 @@ class TodoApp {
                     className += ' due-soon';
                     statusText = ' (Due Soon)';
                 }
-                
-                // Add time if specified
+
+                // Add time if specified, using custom time formatting
                 let timeHTML = '';
                 if (task.dueTime) {
-                    timeHTML = `<span class="time-badge">${task.dueTime}</span>`;
+                    const formattedTime = this.formatTime(task.dueTime);
+                    timeHTML = `<span class="time-badge">${formattedTime}</span>`;
                 }
                 
                 // Add reminder indicator
@@ -3223,9 +3688,9 @@ class TodoApp {
                 `;
             }
 
-            // Description preview - show if description exists and is not empty
+            // Description preview - show if description exists and is not empty and setting enabled
             let descriptionHTML = '';
-            if (task.description && task.description.trim() !== '') {
+            if (settings.showDescriptions !== false && task.description && task.description.trim() !== '') {
                 const preview = task.description.length > 100
                     ? task.description.substring(0, 100) + '...'
                     : task.description;
@@ -3243,17 +3708,27 @@ class TodoApp {
             if (hasSubtasks) {
                 const completedCount = task.subtasks.filter(s => s.done).length;
                 const totalCount = task.subtasks.length;
-                subtaskIndicatorHTML = `
-                    <span class="subtask-indicator">
-                        <i class="fas fa-list"></i> ${completedCount}/${totalCount}
-                    </span>
-                `;
+
+                // Only show subtask count if setting is enabled
+                if (settings.showSubtaskCount !== false) {
+                    subtaskIndicatorHTML = `
+                        <span class="subtask-indicator">
+                            <i class="fas fa-list"></i> ${completedCount}/${totalCount}
+                        </span>
+                    `;
+                }
 
                 expandButtonHTML = `
                     <button class="task-expand-btn ${isExpanded ? 'expanded' : ''}" onclick="todoApp.toggleTaskExpansion('${task.id}')" title="${isExpanded ? 'Collapse' : 'Expand'} subtasks">
                         <i class="fas fa-chevron-${isExpanded ? 'down' : 'right'}"></i>
                     </button>
                 `;
+            }
+
+            // Only show priority if setting is enabled
+            let displayPriorityHTML = '';
+            if (settings.showPriorityColors !== false) {
+                displayPriorityHTML = priorityHTML;
             }
 
             taskEl.innerHTML = `
@@ -3266,7 +3741,7 @@ class TodoApp {
                 </div>
                 <div class="task-info">
                     <div class="task-text">
-                        ${this.escapeHtml(task.text)}${subtaskIndicatorHTML}${priorityHTML}
+                        ${this.escapeHtml(task.text)}${subtaskIndicatorHTML}${displayPriorityHTML}
                     </div>
                     ${descriptionHTML}
                     ${dueDateHTML}
