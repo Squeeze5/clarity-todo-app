@@ -11,6 +11,9 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body>
+    <!-- Background overlay -->
+    <div class="app-background-overlay" id="app-background-overlay"></div>
+
     <div class="app-container">
         <header class="app-header">
             <div class="header-top">
@@ -542,6 +545,26 @@
                         </div>
 
                         <input type="file" id="theme-file-input" accept=".css" style="display: none;">
+
+                        <div class="settings-divider"></div>
+
+                        <h4 class="settings-section-title">Backgrounds</h4>
+                        <p class="settings-help" style="margin-bottom: 16px;">Choose a background or upload your own image</p>
+
+                        <div class="backgrounds-gallery" id="backgrounds-gallery">
+                            <!-- Backgrounds will be dynamically rendered here -->
+                        </div>
+
+                        <input type="file" id="background-file-input" accept="image/*" style="display: none;">
+
+                        <div class="settings-group">
+                            <label class="settings-label">Background Opacity</label>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <input type="range" id="background-opacity" class="settings-range" min="0" max="100" value="10" step="5">
+                                <span id="background-opacity-value" class="settings-range-value">10%</span>
+                            </div>
+                            <p class="settings-help">Adjust background transparency (lower = more transparent)</p>
+                        </div>
 
                         <div class="settings-divider"></div>
 

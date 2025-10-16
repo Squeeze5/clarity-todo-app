@@ -559,6 +559,7 @@ class TodoApp {
         this.initializeReminders();
         this.applyStoredSettings();
         this.initializeThemes();
+        this.initializeBackgrounds();
     }
 
     // Security: HTML escaping to prevent XSS attacks
@@ -1972,6 +1973,336 @@ class TodoApp {
         URL.revokeObjectURL(url);
 
         this.showNotification('Theme exported successfully!');
+    }
+
+    // Background Management System
+    getDefaultBackgrounds() {
+        return {
+            'none': {
+                name: 'None',
+                isDefault: true,
+                type: 'none',
+                value: null
+            },
+            'gradient-sunset': {
+                name: 'Sunset',
+                isDefault: true,
+                type: 'gradient',
+                value: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+            },
+            'gradient-ocean': {
+                name: 'Ocean',
+                isDefault: true,
+                type: 'gradient',
+                value: 'linear-gradient(120deg, #89f7fe 0%, #66a6ff 100%)'
+            },
+            'gradient-forest': {
+                name: 'Forest',
+                isDefault: true,
+                type: 'gradient',
+                value: 'linear-gradient(to right, #0f2027, #203a43, #2c5364)'
+            },
+            'gradient-peach': {
+                name: 'Peach',
+                isDefault: true,
+                type: 'gradient',
+                value: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)'
+            },
+            'gradient-aurora': {
+                name: 'Aurora',
+                isDefault: true,
+                type: 'gradient',
+                value: 'linear-gradient(135deg, #667eea 0%, #f6d365 51%, #fda085 100%)'
+            }
+        };
+    }
+
+    initializeBackgrounds() {
+        const savedBackgrounds = localStorage.getItem('customBackgrounds');
+        const customBackgrounds = savedBackgrounds ? JSON.parse(savedBackgrounds) : {};
+        const defaultBackgrounds = this.getDefaultBackgrounds();
+        this.backgrounds = { ...defaultBackgrounds, ...customBackgrounds };
+
+        // Get current background
+        this.currentBackground = localStorage.getItem('currentBackgroundId') || 'none';
+        this.backgroundOpacity = parseInt(localStorage.getItem('backgroundOpacity') || '10');
+
+        // Create background overlay element immediately
+        this.createBackgroundOverlay();
+
+        // Apply current background immediately
+        this.applyBackground(this.currentBackground);
+
+        // Setup UI when available (after a short delay to ensure DOM is ready)
+        setTimeout(() => {
+            // Render backgrounds gallery
+            this.renderBackgroundsGallery();
+
+            // Setup background file upload
+            const fileInput = document.getElementById('background-file-input');
+            if (fileInput) {
+                fileInput.addEventListener('change', (e) => this.handleBackgroundUpload(e));
+            }
+
+            // Setup opacity slider
+            const opacitySlider = document.getElementById('background-opacity');
+            const opacityValue = document.getElementById('background-opacity-value');
+            if (opacitySlider) {
+                opacitySlider.value = this.backgroundOpacity;
+                if (opacityValue) {
+                    opacityValue.textContent = `${this.backgroundOpacity}%`;
+                }
+                opacitySlider.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    this.backgroundOpacity = value;
+                    if (opacityValue) {
+                        opacityValue.textContent = `${value}%`;
+                    }
+                    localStorage.setItem('backgroundOpacity', value);
+                    this.applyBackground(this.currentBackground);
+                });
+            }
+        }, 100);
+    }
+
+    createBackgroundOverlay() {
+        // Remove existing overlay if any
+        const existing = document.querySelector('.app-background-overlay');
+        if (existing) existing.remove();
+
+        // Create new overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'app-background-overlay';
+        overlay.id = 'app-background-overlay';
+        document.body.insertBefore(overlay, document.body.firstChild);
+    }
+
+    renderBackgroundsGallery() {
+        const gallery = document.getElementById('backgrounds-gallery');
+        if (!gallery) return;
+
+        gallery.innerHTML = '';
+
+        // Render all backgrounds
+        Object.keys(this.backgrounds).forEach(bgId => {
+            const bg = this.backgrounds[bgId];
+            const card = this.createBackgroundCard(bgId, bg);
+            gallery.appendChild(card);
+        });
+
+        // Add "+" card for custom backgrounds
+        const addCard = document.createElement('div');
+        addCard.className = 'background-card add-background';
+        addCard.innerHTML = '<i class="fas fa-plus"></i>';
+        addCard.addEventListener('click', () => {
+            document.getElementById('background-file-input').click();
+        });
+        gallery.appendChild(addCard);
+    }
+
+    createBackgroundCard(bgId, bg) {
+        const card = document.createElement('div');
+        card.className = `background-card ${this.currentBackground === bgId ? 'selected' : ''}`;
+        card.setAttribute('data-bg-id', bgId);
+
+        let previewStyle = '';
+        if (bg.type === 'none') {
+            previewStyle = 'background: var(--bg-secondary);';
+        } else if (bg.type === 'gradient') {
+            previewStyle = `background: ${bg.value};`;
+        } else if (bg.type === 'image') {
+            previewStyle = `background-image: url('${bg.value}'); background-size: cover; background-position: center;`;
+        }
+
+        card.innerHTML = `
+            <div class="background-checkbox">
+                ${this.currentBackground === bgId ? '<i class="fas fa-check"></i>' : ''}
+            </div>
+            <div class="background-preview ${bg.type === 'gradient' ? 'gradient' : ''}" style="${previewStyle}">
+                <div class="background-info">
+                    <span class="background-name">${this.escapeHtml(bg.name)}</span>
+                    ${!bg.isDefault ? `
+                        <div class="background-actions">
+                            <button class="background-action-btn delete" onclick="todoApp.deleteBackground('${bgId}')" title="Delete background">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+
+        card.addEventListener('click', (e) => {
+            // Don't select if clicking action buttons
+            if (e.target.closest('.background-actions')) return;
+            this.selectBackground(bgId);
+        });
+
+        return card;
+    }
+
+    selectBackground(bgId) {
+        if (!this.backgrounds[bgId]) return;
+
+        this.currentBackground = bgId;
+        localStorage.setItem('currentBackgroundId', bgId);
+
+        // Apply background
+        this.applyBackground(bgId);
+
+        // Update gallery selection
+        this.renderBackgroundsGallery();
+    }
+
+    applyBackground(bgId) {
+        const bg = this.backgrounds[bgId];
+        if (!bg) return;
+
+        const overlay = document.getElementById('app-background-overlay');
+        if (!overlay) return;
+
+        const opacity = this.backgroundOpacity / 100;
+
+        if (bg.type === 'none') {
+            overlay.style.background = 'none';
+            overlay.style.opacity = '0';
+        } else if (bg.type === 'gradient') {
+            overlay.style.background = bg.value;
+            overlay.style.backgroundImage = bg.value;
+            overlay.style.opacity = opacity.toString();
+        } else if (bg.type === 'image') {
+            overlay.style.backgroundImage = `url('${bg.value}')`;
+            overlay.style.opacity = opacity.toString();
+        }
+    }
+
+    async handleBackgroundUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Please upload a valid image file (JPG, PNG, GIF, WebP).');
+            return;
+        }
+
+        // Validate file size (max 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            alert('Image file is too large. Please upload an image smaller than 5MB.');
+            return;
+        }
+
+        try {
+            // Load and validate image dimensions
+            const img = await this.loadImage(file);
+
+            // Recommended dimensions: 1920x1080 or similar aspect ratio
+            const recommendedWidth = 1920;
+            const recommendedHeight = 1080;
+            const aspectRatio = img.width / img.height;
+            const recommendedAspectRatio = recommendedWidth / recommendedHeight;
+
+            // Warn if aspect ratio is very different
+            if (Math.abs(aspectRatio - recommendedAspectRatio) > 0.3) {
+                const proceed = await this.showConfirmation(
+                    'Aspect Ratio Warning',
+                    `Image aspect ratio (${img.width}x${img.height}) is different from recommended (16:9).\n\nThis might not look optimal. Continue anyway?`
+                );
+                if (!proceed) {
+                    event.target.value = '';
+                    return;
+                }
+            }
+
+            // Convert to base64
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dataUrl = e.target.result;
+                const bgName = file.name.replace(/\.[^/.]+$/, ''); // Remove extension
+                const bgId = 'custom_' + Date.now();
+
+                // Add to backgrounds
+                this.backgrounds[bgId] = {
+                    name: bgName,
+                    isDefault: false,
+                    type: 'image',
+                    value: dataUrl
+                };
+
+                // Save custom backgrounds
+                this.saveCustomBackgrounds();
+
+                // Re-render gallery
+                this.renderBackgroundsGallery();
+
+                // Select the new background
+                this.selectBackground(bgId);
+
+                this.showNotification(`Background "${bgName}" uploaded successfully!`);
+            };
+
+            reader.readAsDataURL(file);
+        } catch (error) {
+            console.error('Error uploading background:', error);
+            alert('Error uploading background. Please try again.');
+        }
+
+        // Reset file input
+        event.target.value = '';
+    }
+
+    loadImage(file) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                resolve(img);
+            };
+
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Failed to load image'));
+            };
+
+            img.src = url;
+        });
+    }
+
+    saveCustomBackgrounds() {
+        const customBackgrounds = {};
+        Object.keys(this.backgrounds).forEach(id => {
+            if (!this.backgrounds[id].isDefault) {
+                customBackgrounds[id] = this.backgrounds[id];
+            }
+        });
+        localStorage.setItem('customBackgrounds', JSON.stringify(customBackgrounds));
+    }
+
+    async deleteBackground(bgId) {
+        if (this.backgrounds[bgId]?.isDefault) {
+            alert('Cannot delete default backgrounds.');
+            return;
+        }
+
+        const confirmed = await this.showConfirmation('Delete Background', `Are you sure you want to delete "${this.backgrounds[bgId].name}"?`);
+        if (!confirmed) return;
+
+        // If current background, switch to none
+        if (this.currentBackground === bgId) {
+            this.selectBackground('none');
+        }
+
+        // Delete background
+        delete this.backgrounds[bgId];
+        this.saveCustomBackgrounds();
+
+        // Re-render
+        this.renderBackgroundsGallery();
+
+        this.showNotification('Background deleted successfully');
     }
 
     exportData() {

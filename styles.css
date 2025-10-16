@@ -17,6 +17,7 @@
     --hover-bg: #f9f9f9;
     --task-bg: #ffffff;
     --modal-backdrop: rgba(0, 0, 0, 0.3);
+    --bg-opacity: 0.9;  /* Default opacity for UI elements */
 }
 
 [data-theme="dark"] {
@@ -33,6 +34,7 @@
     --hover-bg: #282828;
     --task-bg: #1f1f1f;
     --modal-backdrop: rgba(0, 0, 0, 0.6);
+    --bg-opacity: 0.9;  /* Default opacity for UI elements */
 }
 
 * {
@@ -43,7 +45,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-    background: var(--bg-secondary);
+    background: transparent;  /* Transparent to show background */
     min-height: 100vh;
     color: var(--text-primary);
     font-size: 13px;
@@ -55,18 +57,26 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    background: var(--bg-primary);
+    background: transparent;  /* Transparent to show background */
+    position: relative;
+    z-index: 1;
 }
 
 /* HEADER - Todoist Style */
 .app-header {
-    background: var(--bg-primary);
+    background: rgba(255, 255, 255, 0.75);  /* 75% opacity */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-color);
     padding: 0 24px;
     height: 56px;
     display: flex;
     align-items: center;
     z-index: 100;
+}
+
+[data-theme="dark"] .app-header {
+    background: rgba(31, 31, 31, 0.75);
 }
 
 .header-top {
@@ -141,11 +151,17 @@ body {
 /* SIDEBAR - Todoist Style */
 .sidebar {
     width: 305px;
-    background: var(--bg-secondary);
+    background: rgba(250, 250, 250, 0.75);  /* 75% opacity */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-right: 1px solid var(--border-color);
     padding: 0;
     overflow-y: auto;
     flex-shrink: 0;
+}
+
+[data-theme="dark"] .sidebar {
+    background: rgba(40, 40, 40, 0.75);
 }
 
 /* Sidebar User Profile Section */
@@ -319,11 +335,15 @@ body {
 .task-area {
     flex: 1;
     padding: 48px 64px;
-    background: var(--bg-primary);
+    background: rgba(255, 255, 255, 0.75);  /* 75% opacity */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     overflow-y: auto;
-    max-width: 900px;
-    margin: 0 auto;
     width: 100%;
+}
+
+[data-theme="dark"] .task-area {
+    background: rgba(31, 31, 31, 0.75);
 }
 
 .breadcrumb {
@@ -970,7 +990,9 @@ body {
 }
 
 .modal-content {
-    background: var(--bg-primary);
+    background: rgba(255, 255, 255, 0.98);  /* Semi-transparent modal */
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-radius: 10px;
     box-shadow: 0 20px 50px var(--shadow-md);
     width: 90%;
@@ -979,6 +1001,10 @@ body {
     overflow-y: auto;
     transform: scale(0.95);
     transition: transform 0.2s;
+}
+
+[data-theme="dark"] .modal-content {
+    background: rgba(31, 31, 31, 0.98);
 }
 
 .modal.active .modal-content {
@@ -1906,4 +1932,211 @@ body.compact-mode .form-textarea {
 .theme-checkbox i {
     color: white;
     font-size: 10px;
+}
+
+/* BACKGROUNDS GALLERY */
+.backgrounds-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.background-card {
+    position: relative;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--bg-primary);
+    aspect-ratio: 16 / 9;
+}
+
+.background-card:hover {
+    border-color: var(--text-tertiary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-md);
+}
+
+.background-card.selected {
+    border-color: var(--accent-red);
+    border-width: 3px;
+}
+
+.background-card.add-background {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-style: dashed;
+    background: var(--bg-secondary);
+}
+
+.background-card.add-background:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-red);
+}
+
+.background-card.add-background i {
+    font-size: 32px;
+    color: var(--text-tertiary);
+}
+
+.background-card.add-background:hover i {
+    color: var(--accent-red);
+}
+
+.background-preview {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    position: relative;
+}
+
+.background-preview.gradient {
+    background-size: 100% 100%;
+}
+
+.background-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px;
+    background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.background-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    flex: 1;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.background-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.background-card:hover .background-actions {
+    opacity: 1;
+}
+
+.background-action-btn {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.background-action-btn:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+.background-action-btn.delete:hover {
+    background: var(--accent-red);
+}
+
+.background-checkbox {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.background-card:hover .background-checkbox,
+.background-card.selected .background-checkbox {
+    opacity: 1;
+}
+
+.background-card.selected .background-checkbox {
+    background: var(--accent-red);
+    border-color: var(--accent-red);
+}
+
+.background-checkbox i {
+    color: white;
+    font-size: 10px;
+}
+
+/* Range Slider */
+.settings-range {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-secondary);
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.settings-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-red);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.settings-range::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.settings-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent-red);
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+}
+
+.settings-range::-moz-range-thumb:hover {
+    transform: scale(1.2);
+}
+
+.settings-range-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 40px;
+    text-align: right;
+}
+
+/* Background overlay for app */
+.app-background-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;  /* Behind all UI elements */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    pointer-events: none;
 }
