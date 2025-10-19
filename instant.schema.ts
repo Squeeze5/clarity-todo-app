@@ -19,6 +19,7 @@ const _schema = i.schema({
       parentFolderId: i.string().indexed().optional(), // parent folder ID for subfolders
       level: i.number().optional(), // nesting level (0 for root, 1 for first level subfolder, etc.)
       path: i.string().optional(), // full path like "parent/child/grandchild"
+      order: i.number().indexed().optional(), // display order for manual reordering
       userId: i.string().indexed().optional(), // owner user ID
     }),
     todos: i.entity({
@@ -34,6 +35,7 @@ const _schema = i.schema({
       reminderTiming: i.string().optional(), // '10min', '30min', '1hour', '2hours', '1day', etc.
       reminderSent: i.boolean().optional(), // track if reminder was sent
       reminderTimestamp: i.number().indexed().optional(), // calculated timestamp for when to send reminder
+      order: i.number().indexed().optional(), // display order for manual reordering
       userId: i.string().indexed().optional(), // owner user ID
       userEmail: i.string().optional(), // user email for backend email sending
     }),

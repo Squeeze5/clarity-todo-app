@@ -1261,9 +1261,9 @@ class TodoApp {
 
     handleFoldersUpdate(folders) {
         console.log('Folders updated:', folders);
-        
+
         this.folders = folders;
-        
+
         // Extract all todos from all folders
         this.tasks = [];
         folders.forEach(folder => {
@@ -1276,37 +1276,105 @@ class TodoApp {
                 });
             }
         });
-        
-        // If no folders exist, create default Inbox folder
-        if (this.folders.length === 0) {
+
+        // If no folders exist, create default Inbox folder (only once)
+        // But NOT if we're in the middle of an email migration
+        if (this.folders.length === 0 && !this.creatingDefaultFolder && !this.migratingEmail) {
             console.log('No folders found, creating default Inbox folder...');
             this.createDefaultFolder();
             return;
         }
-        
+
         // Set current folder to default Inbox or first folder
         if (!this.currentFolderId) {
             const defaultFolder = this.folders.find(f => f.isDefault);
             this.currentFolderId = defaultFolder ? defaultFolder.id : this.folders[0]?.id;
         }
-        
+
         this.render();
     }
 
     async createDefaultFolder() {
+        // Prevent multiple simultaneous creation attempts
+        if (this.creatingDefaultFolder) {
+            console.log('Already creating default folder, skipping...');
+            return;
+        }
+
+        this.creatingDefaultFolder = true;
+
         try {
             const folderId = window.crypto.randomUUID();
             await db.transact([
                 db.tx.folders[folderId].update({
                     text: 'Inbox',
                     color: '#3b82f6',
+                    icon: 'inbox',
                     isDefault: true,
-                    userId: this.userId
+                    userId: this.userId,
+                    createdAt: Date.now()
                 })
             ]);
             console.log('Default folder created for user:', this.userId);
         } catch (error) {
             console.error('Error creating default folder:', error);
+            // Reset flag on error so we can try again later if needed
+            this.creatingDefaultFolder = false;
+        }
+    }
+
+    // Utility method to generate unique IDs
+    generateId() {
+        return window.crypto.randomUUID();
+    }
+
+    // Cleanup duplicate folders (both Inbox and other folders)
+    async cleanupDuplicateInboxFolders() {
+        try {
+            // Group folders by name/text
+            const foldersByName = {};
+
+            for (const folder of this.folders) {
+                const folderName = folder.text || 'Unnamed';
+                if (!foldersByName[folderName]) {
+                    foldersByName[folderName] = [];
+                }
+                foldersByName[folderName].push(folder);
+            }
+
+            const transactions = [];
+            let totalDeleted = 0;
+
+            // For each group of folders with the same name
+            for (const [name, folders] of Object.entries(foldersByName)) {
+                if (folders.length > 1) {
+                    console.log(`Found ${folders.length} folders named "${name}"`);
+
+                    // Keep the oldest one (first created)
+                    const sorted = folders.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                    const deleteFolders = sorted.slice(1);
+
+                    // Delete duplicates
+                    for (const folder of deleteFolders) {
+                        transactions.push(db.tx.folders[folder.id].delete());
+                        totalDeleted++;
+                    }
+
+                    console.log(`Keeping "${name}" (${sorted[0].id}), deleting ${deleteFolders.length} duplicates`);
+                }
+            }
+
+            if (transactions.length > 0) {
+                await db.transact(transactions);
+                console.log(`Deleted ${totalDeleted} duplicate folders`);
+                this.showNotification(`Cleaned up ${totalDeleted} duplicate folder(s)!`);
+            } else {
+                console.log('No duplicate folders found');
+                this.showNotification('No duplicate folders found');
+            }
+        } catch (error) {
+            console.error('Error cleaning up duplicate folders:', error);
+            this.showNotification('Error cleaning up duplicates. Please try again.');
         }
     }
 
@@ -1470,6 +1538,11 @@ class TodoApp {
             this.exportData();
         });
 
+        // Clean up duplicate folders button
+        document.getElementById('cleanup-folders-btn')?.addEventListener('click', () => {
+            this.cleanupDuplicateInboxFolders();
+        });
+
         // Theme change listener
         document.getElementById('settings-theme')?.addEventListener('change', (e) => {
             this.applyThemeSetting(e.target.value);
@@ -1485,8 +1558,16 @@ class TodoApp {
             this.showResetPasswordModal();
         });
 
+        // Change Email button
+        document.getElementById('change-email-btn')?.addEventListener('click', () => {
+            this.showChangeEmailModal();
+        });
+
         // Reset Password Modal listeners
         this.setupResetPasswordListeners();
+
+        // Change Email Modal listeners
+        this.setupChangeEmailListeners();
     }
 
     async loadSettings() {
@@ -2639,6 +2720,390 @@ class TodoApp {
         }
     }
 
+    // Email Change Methods
+    setupChangeEmailListeners() {
+        // Change Email Modal
+        document.getElementById('change-email-modal-close')?.addEventListener('click', () => {
+            this.hideChangeEmailModal();
+        });
+
+        document.getElementById('change-email-cancel-btn')?.addEventListener('click', () => {
+            this.hideChangeEmailModal();
+        });
+
+        document.getElementById('change-email-submit-btn')?.addEventListener('click', () => {
+            this.submitEmailChange();
+        });
+
+        // Verify Email Change Modal
+        document.getElementById('verify-email-change-modal-close')?.addEventListener('click', () => {
+            this.hideVerifyEmailChangeModal();
+        });
+
+        document.getElementById('verify-email-change-cancel-btn')?.addEventListener('click', () => {
+            this.hideVerifyEmailChangeModal();
+        });
+
+        document.getElementById('verify-email-change-submit-btn')?.addEventListener('click', () => {
+            this.verifyAndChangeEmail();
+        });
+    }
+
+    showChangeEmailModal() {
+        // Hide settings modal
+        this.hideSettingsModal();
+
+        // Show change email modal
+        const modal = document.getElementById('change-email-modal');
+        modal?.classList.add('active');
+
+        // Set current email
+        document.getElementById('change-email-current').value = this.userEmail || '';
+        document.getElementById('change-email-new').value = '';
+        document.getElementById('change-email-error').style.display = 'none';
+    }
+
+    hideChangeEmailModal() {
+        document.getElementById('change-email-modal')?.classList.remove('active');
+    }
+
+    hideVerifyEmailChangeModal() {
+        document.getElementById('verify-email-change-modal')?.classList.remove('active');
+    }
+
+    async submitEmailChange() {
+        const newEmail = document.getElementById('change-email-new').value.trim();
+        const errorEl = document.getElementById('change-email-error');
+
+        // Validation
+        if (!newEmail) {
+            errorEl.textContent = 'Please enter a new email address';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(newEmail)) {
+            errorEl.textContent = 'Please enter a valid email address';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        // Check if email is the same as current
+        if (newEmail.toLowerCase() === this.userEmail.toLowerCase()) {
+            errorEl.textContent = 'New email must be different from current email';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            // Send magic codes to both old and new emails
+            await db.auth.sendMagicCode({ email: this.userEmail });
+            await db.auth.sendMagicCode({ email: newEmail });
+
+            // Store new email temporarily
+            this.tempNewEmail = newEmail;
+
+            // Hide change email modal and show verification modal
+            this.hideChangeEmailModal();
+
+            const verifyModal = document.getElementById('verify-email-change-modal');
+            verifyModal?.classList.add('active');
+
+            // Set email displays
+            document.getElementById('verify-old-email-display').textContent = this.userEmail;
+            document.getElementById('verify-new-email-display').textContent = newEmail;
+
+            // Clear inputs
+            document.getElementById('verify-old-email-code').value = '';
+            document.getElementById('verify-new-email-code').value = '';
+            document.getElementById('verify-email-change-error').style.display = 'none';
+
+            this.showNotification('Verification codes sent to both email addresses!');
+        } catch (error) {
+            console.error('Error sending magic codes:', error);
+            errorEl.textContent = 'Failed to send verification codes. Please try again.';
+            errorEl.style.display = 'block';
+        }
+    }
+
+    async verifyAndChangeEmail() {
+        const oldEmailCode = document.getElementById('verify-old-email-code').value.trim();
+        const newEmailCode = document.getElementById('verify-new-email-code').value.trim();
+        const errorEl = document.getElementById('verify-email-change-error');
+
+        // Validation
+        if (!oldEmailCode || oldEmailCode.length !== 6) {
+            errorEl.textContent = 'Please enter the 6-digit code from your current email';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        if (!newEmailCode || newEmailCode.length !== 6) {
+            errorEl.textContent = 'Please enter the 6-digit code from your new email';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            // Set migration flag to prevent auto-creation of default folders
+            this.migratingEmail = true;
+
+            // Verify code from old email (confirms we're the owner of old account)
+            await db.auth.signInWithMagicCode({ email: this.userEmail, code: oldEmailCode });
+
+            // Store old user data
+            const oldEmail = this.userEmail;
+            const oldUserId = this.userId;
+
+            // Fetch all data from old account
+            this.showNotification('Fetching your data from old account...');
+
+            const oldDataResult = await new Promise((resolve, reject) => {
+                let unsubscribe;
+                unsubscribe = db.subscribeQuery({
+                    folders: {
+                        $: { where: { userId: oldUserId } },
+                        todos: {
+                            $: { where: { userId: oldUserId } },
+                            subtasks: { $: { where: { userId: oldUserId } } }
+                        }
+                    },
+                    sections: {
+                        $: { where: { userId: oldUserId } }
+                    }
+                }, (resp) => {
+                    if (unsubscribe) unsubscribe();
+                    if (resp.error) {
+                        reject(resp.error);
+                    } else {
+                        resolve(resp.data);
+                    }
+                });
+            });
+
+            // DELETE old account data FIRST (while still authenticated as old user)
+            this.showNotification('Removing data from old account...');
+
+            const deleteTransactions = [];
+
+            // Delete old folders (this will cascade delete todos and subtasks via relationships)
+            if (oldDataResult.folders) {
+                for (const folder of oldDataResult.folders) {
+                    deleteTransactions.push(db.tx.folders[folder.id].delete());
+                }
+            }
+
+            // Delete old sections
+            if (oldDataResult.sections) {
+                for (const section of oldDataResult.sections) {
+                    deleteTransactions.push(db.tx.sections[section.id].delete());
+                }
+            }
+
+            // Execute deletions while still authenticated as old user
+            if (deleteTransactions.length > 0) {
+                await db.transact(deleteTransactions);
+                console.log(`Deleted ${deleteTransactions.length} items from old account`);
+            }
+
+            // Now sign in with new email to create/access new account
+            this.showNotification('Switching to new account...');
+            await db.auth.signInWithMagicCode({ email: this.tempNewEmail, code: newEmailCode });
+
+            // Get new user info (wait for auth to complete)
+            const newUser = await waitForAuth(5000);
+            if (!newUser) {
+                throw new Error('Failed to get new user information');
+            }
+
+            const newUserId = newUser.id;
+            this.userId = newUserId;
+            this.userEmail = this.tempNewEmail;
+
+            // Check if new account already has data (from previous migrations) and delete it
+            this.showNotification('Checking new account for old data...');
+
+            const newAccountData = await new Promise((resolve, reject) => {
+                let unsubscribe;
+                unsubscribe = db.subscribeQuery({
+                    folders: {
+                        $: { where: { userId: newUserId } }
+                    },
+                    sections: {
+                        $: { where: { userId: newUserId } }
+                    }
+                }, (resp) => {
+                    if (unsubscribe) unsubscribe();
+                    if (resp.error) {
+                        reject(resp.error);
+                    } else {
+                        resolve(resp.data);
+                    }
+                });
+            });
+
+            // Delete any existing data in new account
+            if (newAccountData.folders?.length > 0 || newAccountData.sections?.length > 0) {
+                this.showNotification('Clearing old data from new account...');
+
+                const clearTransactions = [];
+
+                if (newAccountData.folders) {
+                    for (const folder of newAccountData.folders) {
+                        clearTransactions.push(db.tx.folders[folder.id].delete());
+                    }
+                }
+
+                if (newAccountData.sections) {
+                    for (const section of newAccountData.sections) {
+                        clearTransactions.push(db.tx.sections[section.id].delete());
+                    }
+                }
+
+                if (clearTransactions.length > 0) {
+                    await db.transact(clearTransactions);
+                    console.log(`Cleared ${clearTransactions.length} old items from new account`);
+                }
+            }
+
+            // Migrate data to new account
+            this.showNotification('Creating your data in new account...');
+
+            const transactions = [];
+            const folderIdMap = {}; // Map old folder IDs to new folder IDs
+
+            // Migrate folders
+            if (oldDataResult.folders) {
+                for (const folder of oldDataResult.folders) {
+                    const newFolderId = this.generateId();
+                    folderIdMap[folder.id] = newFolderId;
+
+                    transactions.push(
+                        db.tx.folders[newFolderId].update({
+                            text: folder.text,
+                            color: folder.color,
+                            icon: folder.icon || 'inbox',
+                            isDefault: folder.isDefault || false,
+                            userId: newUserId,
+                            createdAt: folder.createdAt || Date.now(),
+                            parentFolderId: folder.parentFolderId ? folderIdMap[folder.parentFolderId] : null,
+                            level: folder.level || 0,
+                            path: folder.path || folder.text
+                        })
+                    );
+                }
+            }
+
+            // Migrate sections
+            if (oldDataResult.sections) {
+                for (const section of oldDataResult.sections) {
+                    const newSectionId = this.generateId();
+                    const newFolderId = folderIdMap[section.folderId];
+
+                    if (newFolderId) {
+                        transactions.push(
+                            db.tx.sections[newSectionId].update({
+                                text: section.text,
+                                userId: newUserId,
+                                createdAt: section.createdAt || Date.now(),
+                                order: section.order || 0
+                            }).link({ folder: newFolderId })
+                        );
+                    }
+                }
+            }
+
+            // Migrate todos and subtasks
+            if (oldDataResult.folders) {
+                for (const folder of oldDataResult.folders) {
+                    const newFolderId = folderIdMap[folder.id];
+                    if (!newFolderId) continue;
+
+                    if (folder.todos) {
+                        for (const todo of folder.todos) {
+                            const newTodoId = this.generateId();
+
+                            transactions.push(
+                                db.tx.todos[newTodoId].update({
+                                    text: todo.text,
+                                    description: todo.description || '',
+                                    done: todo.done || false,
+                                    priority: todo.priority || 4,
+                                    dueDate: todo.dueDate || null,
+                                    dueTime: todo.dueTime || null,
+                                    reminderType: todo.reminderType || 'none',
+                                    reminderTiming: todo.reminderTiming || '1hour',
+                                    reminderTimestamp: todo.reminderTimestamp || null,
+                                    reminderSent: todo.reminderSent || false,
+                                    sectionId: todo.sectionId || null,
+                                    userId: newUserId,
+                                    createdAt: todo.createdAt || Date.now()
+                                }).link({ folder: newFolderId })
+                            );
+
+                            // Migrate subtasks
+                            if (todo.subtasks) {
+                                for (const subtask of todo.subtasks) {
+                                    const newSubtaskId = this.generateId();
+                                    transactions.push(
+                                        db.tx.subtasks[newSubtaskId].update({
+                                            text: subtask.text,
+                                            done: subtask.done || false,
+                                            userId: newUserId,
+                                            createdAt: subtask.createdAt || Date.now()
+                                        }).link({ todo: newTodoId })
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Execute all migrations
+            if (transactions.length > 0) {
+                await db.transact(transactions);
+            }
+
+            // Update localStorage
+            localStorage.setItem('userEmail', this.tempNewEmail);
+
+            // Clear temp email and migration flag
+            this.tempNewEmail = null;
+            this.migratingEmail = false;
+
+            // Hide verification modal
+            this.hideVerifyEmailChangeModal();
+
+            // Show success message
+            this.showNotification(`Email successfully changed! All your data has been moved from ${oldEmail} to ${this.userEmail}. Refreshing...`);
+
+            // Reload the page to reinitialize with new user
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+
+        } catch (error) {
+            console.error('Error verifying codes or migrating data:', error);
+
+            // Clear migration flag on error
+            this.migratingEmail = false;
+
+            let errorMessage = 'Failed to change email. Please try again.';
+
+            if (error.message && error.message.includes('expired')) {
+                errorMessage = 'Verification codes have expired. Please start the process again.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
+            errorEl.textContent = errorMessage;
+            errorEl.style.display = 'block';
+        }
+    }
+
     showNotification(message) {
         // Simple notification - can be enhanced later
         const notification = document.createElement('div');
@@ -3470,9 +3935,10 @@ class TodoApp {
         }
     }
 
-    // Drag and Drop
+    // Drag and Drop (for moving tasks between folders)
     handleDragStart(e, taskId) {
         this.draggedTaskId = taskId;
+        this.dragMode = 'task-move';
         e.dataTransfer.effectAllowed = 'move';
         e.target.classList.add('dragging');
     }
@@ -3513,7 +3979,7 @@ class TodoApp {
 
         // Capture the dragged task ID immediately before it gets cleared
         const draggedTaskId = this.draggedTaskId;
-        
+
         if (!draggedTaskId || !folderId || folderId === this.currentFolderId) {
             console.log('Early return - missing draggedTaskId or folderId, or same folder');
             return;
@@ -3542,16 +4008,16 @@ class TodoApp {
             console.log('Task ID:', draggedTaskId);  // Use captured value
             console.log('Target Folder ID:', targetFolder.id);
             console.log('Folder ID type:', typeof targetFolder.id);
-            
+
             // Ensure we have valid UUIDs
             if (!targetFolder.id || typeof targetFolder.id !== 'string') {
                 throw new Error(`Invalid folder ID: ${targetFolder.id}`);
             }
-            
+
             if (!draggedTaskId || typeof draggedTaskId !== 'string') {
                 throw new Error(`Invalid task ID: ${draggedTaskId}`);
             }
-            
+
             // In InstantDB, we need to delete the task and recreate it with the new folder link
             const taskData = {
                 text: task.text || '',
@@ -3559,18 +4025,18 @@ class TodoApp {
                 createdAt: task.createdAt || Date.now(),
                 userId: this.userId
             };
-            
+
             // Preserve due date if it exists
             if (task.dueDate) {
                 taskData.dueDate = task.dueDate;
             }
-            
+
             // Create new task ID
             const newTaskId = window.crypto.randomUUID();
-            
+
             console.log('New task ID:', newTaskId);
             console.log('Task data:', taskData);
-            
+
             // First attempt: Just like saveTask which works
             const operations = [
                 db.tx.todos[draggedTaskId].delete(),  // Use captured value
@@ -3579,12 +4045,12 @@ class TodoApp {
                     .update(taskData)
                     .link({ folder: targetFolder.id })
             ];
-            
+
             console.log('Executing transaction...');
             await db.transact(operations);
-            
+
             console.log(`Task successfully moved from folder ${task.folder_id} to ${targetFolder.id}`);
-            
+
         } catch (error) {
             console.error('Error moving task:', error);
             console.error('Error details:', {
@@ -3597,6 +4063,194 @@ class TodoApp {
         }
     }
 
+    // Folder Reordering
+    handleFolderDragStart(e, folderId) {
+        this.draggedFolderId = folderId;
+        this.dragMode = 'folder-reorder';
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.classList.add('dragging');
+    }
+
+    handleFolderDragEnd(e) {
+        e.target.classList.remove('dragging');
+        this.draggedFolderId = null;
+        this.dragMode = null;
+
+        // Remove drag indicators
+        document.querySelectorAll('.folder-item').forEach(folder => {
+            folder.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+    }
+
+    handleFolderDragOver(e, folderId) {
+        if (!this.draggedFolderId || this.dragMode !== 'folder-reorder') return;
+
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        // Calculate if we're in top or bottom half
+        const rect = e.currentTarget.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        const isTopHalf = e.clientY < midpoint;
+
+        // Remove existing classes
+        e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+
+        // Add appropriate class
+        if (isTopHalf) {
+            e.currentTarget.classList.add('drag-over-top');
+        } else {
+            e.currentTarget.classList.add('drag-over-bottom');
+        }
+    }
+
+    handleFolderDragLeave(e) {
+        e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+
+    async handleFolderDrop(e, targetFolderId) {
+        if (!this.draggedFolderId || this.dragMode !== 'folder-reorder') return;
+
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+
+        if (this.draggedFolderId === targetFolderId) return;
+
+        try {
+            // Calculate if we're dropping above or below
+            const rect = e.currentTarget.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            const dropAbove = e.clientY < midpoint;
+
+            await this.reorderFolders(this.draggedFolderId, targetFolderId, dropAbove);
+        } catch (error) {
+            console.error('Error reordering folders:', error);
+        }
+    }
+
+    async reorderFolders(draggedId, targetId, insertBefore) {
+        // Get all root folders (same level folders)
+        const rootFolders = this.folders.filter(f => !f.parentFolderId);
+
+        // Sort by order
+        rootFolders.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        // Remove dragged folder
+        const draggedFolder = rootFolders.find(f => f.id === draggedId);
+        const filteredFolders = rootFolders.filter(f => f.id !== draggedId);
+
+        // Find target index
+        const targetIndex = filteredFolders.findIndex(f => f.id === targetId);
+
+        // Insert at new position
+        const newIndex = insertBefore ? targetIndex : targetIndex + 1;
+        filteredFolders.splice(newIndex, 0, draggedFolder);
+
+        // Update order values
+        const transactions = [];
+        filteredFolders.forEach((folder, index) => {
+            transactions.push(
+                db.tx.folders[folder.id].update({ order: index })
+            );
+        });
+
+        await db.transact(transactions);
+    }
+
+    // Task Reordering
+    handleTaskDragStart(e, taskId) {
+        this.draggedTaskId = taskId;
+        this.dragMode = 'task-reorder';
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.classList.add('dragging');
+    }
+
+    handleTaskDragEnd(e) {
+        e.target.classList.remove('dragging');
+        this.draggedTaskId = null;
+        this.dragMode = null;
+
+        // Remove drag indicators
+        document.querySelectorAll('.task-item').forEach(task => {
+            task.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+    }
+
+    handleTaskDragOver(e, taskId) {
+        if (!this.draggedTaskId || this.dragMode !== 'task-reorder') return;
+
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+
+        // Calculate if we're in top or bottom half
+        const rect = e.currentTarget.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        const isTopHalf = e.clientY < midpoint;
+
+        // Remove existing classes
+        e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+
+        // Add appropriate class
+        if (isTopHalf) {
+            e.currentTarget.classList.add('drag-over-top');
+        } else {
+            e.currentTarget.classList.add('drag-over-bottom');
+        }
+    }
+
+    handleTaskDragLeave(e) {
+        e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+
+    async handleTaskDrop(e, targetTaskId) {
+        if (!this.draggedTaskId || this.dragMode !== 'task-reorder') return;
+
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+
+        if (this.draggedTaskId === targetTaskId) return;
+
+        try {
+            // Calculate if we're dropping above or below
+            const rect = e.currentTarget.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            const dropAbove = e.clientY < midpoint;
+
+            await this.reorderTasks(this.draggedTaskId, targetTaskId, dropAbove);
+        } catch (error) {
+            console.error('Error reordering tasks:', error);
+        }
+    }
+
+    async reorderTasks(draggedId, targetId, insertBefore) {
+        // Get tasks in current folder
+        const folderTasks = this.tasks.filter(t => t.folder_id === this.currentFolderId);
+
+        // Sort by order
+        folderTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        // Remove dragged task
+        const draggedTask = folderTasks.find(t => t.id === draggedId);
+        const filteredTasks = folderTasks.filter(t => t.id !== draggedId);
+
+        // Find target index
+        const targetIndex = filteredTasks.findIndex(t => t.id === targetId);
+
+        // Insert at new position
+        const newIndex = insertBefore ? targetIndex : targetIndex + 1;
+        filteredTasks.splice(newIndex, 0, draggedTask);
+
+        // Update order values
+        const transactions = [];
+        filteredTasks.forEach((task, index) => {
+            transactions.push(
+                db.tx.todos[task.id].update({ order: index })
+            );
+        });
+
+        await db.transact(transactions);
+    }
+
     // Rendering Methods
     render() {
         this.renderFolders();
@@ -3606,16 +4260,20 @@ class TodoApp {
 
     renderFolders() {
         if (!this.folders) return;
-        
+
         const folderList = document.getElementById('folder-list');
         if (!folderList) return;
 
         folderList.innerHTML = '';
-        
+
         // Organize folders hierarchically
         const rootFolders = this.folders.filter(f => !f.parentFolderId);
+
+        // Sort root folders by order
+        rootFolders.sort((a, b) => (a.order || 0) - (b.order || 0));
+
         const foldersByParent = {};
-        
+
         this.folders.forEach(folder => {
             if (folder.parentFolderId) {
                 if (!foldersByParent[folder.parentFolderId]) {
@@ -3624,7 +4282,12 @@ class TodoApp {
                 foldersByParent[folder.parentFolderId].push(folder);
             }
         });
-        
+
+        // Sort subfolders by order as well
+        Object.keys(foldersByParent).forEach(parentId => {
+            foldersByParent[parentId].sort((a, b) => (a.order || 0) - (b.order || 0));
+        });
+
         // Render folders recursively
         const renderFolder = (folder, level = 0, isLast = false) => {
             const taskCount = this.tasks.filter(t => t.folder_id === folder.id).length;
@@ -3632,7 +4295,8 @@ class TodoApp {
 
             const folderEl = document.createElement('div');
             folderEl.className = `folder-item ${folder.id === this.currentFolderId ? 'active' : ''}`;
-            
+            folderEl.draggable = true;
+
             // Add subfolder classes for indentation
             if (level > 0) {
                 folderEl.classList.add('subfolder', `subfolder-level-${Math.min(level, 3)}`);
@@ -3640,7 +4304,7 @@ class TodoApp {
                     folderEl.classList.add('last-subfolder');
                 }
             }
-            
+
             folderEl.dataset.folderId = folder.id;
 
             // Apply color styling
@@ -3657,11 +4321,14 @@ class TodoApp {
             }
 
             const icon = folder.isDefault ? 'fas fa-inbox' : 'fas fa-folder';
-            const expandIcon = hasChildren ? 
-                (this.expandedFolders.has(folder.id) ? 'fas fa-chevron-down' : 'fas fa-chevron-right') : 
+            const expandIcon = hasChildren ?
+                (this.expandedFolders.has(folder.id) ? 'fas fa-chevron-down' : 'fas fa-chevron-right') :
                 '';
 
             folderEl.innerHTML = `
+                <span class="drag-handle" title="Drag to reorder">
+                    <i class="fas fa-grip-vertical"></i>
+                </span>
                 ${hasChildren ? `<button class="folder-expand-toggle ${this.expandedFolders.has(folder.id) ? 'expanded' : ''}" onclick="todoApp.toggleFolderExpansion('${folder.id}')"><i class="${expandIcon}"></i></button>` : ''}
                 <i class="${icon}"></i>
                 <span>${this.escapeHtml(folder.text)}</span>
@@ -3680,19 +4347,27 @@ class TodoApp {
 
             // Click to switch folders
             folderEl.addEventListener('click', (e) => {
-                if (!e.target.closest('.folder-actions') && !e.target.closest('.folder-expand-toggle')) {
+                if (!e.target.closest('.folder-actions') && !e.target.closest('.folder-expand-toggle') && !e.target.closest('.drag-handle')) {
                     this.switchFolder(folder.id);
                 }
             });
 
-            // Drag and drop handlers
-            folderEl.addEventListener('dragover', (e) => this.handleDragOver(e));
-            folderEl.addEventListener('dragenter', (e) => this.handleDragEnter(e, folder.id));
-            folderEl.addEventListener('dragleave', (e) => this.handleDragLeave(e));
-            folderEl.addEventListener('drop', (e) => this.handleDrop(e, folder.id));
+            // Folder reordering drag handlers
+            folderEl.addEventListener('dragstart', (e) => this.handleFolderDragStart(e, folder.id));
+            folderEl.addEventListener('dragend', (e) => this.handleFolderDragEnd(e));
+            folderEl.addEventListener('dragover', (e) => this.handleFolderDragOver(e, folder.id));
+            folderEl.addEventListener('dragleave', (e) => this.handleFolderDragLeave(e));
+            folderEl.addEventListener('drop', (e) => this.handleFolderDrop(e, folder.id));
+
+            // Task moving drag handlers (old functionality)
+            folderEl.addEventListener('dragenter', (e) => {
+                if (this.dragMode === 'task-move') {
+                    this.handleDragEnter(e, folder.id);
+                }
+            });
 
             folderList.appendChild(folderEl);
-            
+
             // Render children if expanded
             if (hasChildren && this.expandedFolders.has(folder.id)) {
                 const children = foldersByParent[folder.id] || [];
@@ -3700,14 +4375,14 @@ class TodoApp {
                 const childrenContainer = document.createElement('div');
                 childrenContainer.className = 'folder-children-container';
                 childrenContainer.style.position = 'relative';
-                
+
                 children.forEach((child, index) => {
                     const isLastChild = index === children.length - 1;
                     renderFolder(child, level + 1, isLastChild);
                 });
             }
         };
-        
+
         // Render all root folders
         rootFolders.forEach(folder => renderFolder(folder, 0));
     }
@@ -3879,7 +4554,10 @@ class TodoApp {
 
         // Sort tasks based on user preference
         filteredTasks.sort((a, b) => {
-            if (sortMethod === 'dueDate') {
+            if (sortMethod === 'manual') {
+                // Manual sorting uses order field
+                return (a.order || 0) - (b.order || 0);
+            } else if (sortMethod === 'dueDate') {
                 // Sort by due date
                 const now = Date.now();
                 const aOverdue = a.dueDate && !a.done && a.dueDate < now;
@@ -3915,8 +4593,8 @@ class TodoApp {
                 return b.createdAt - a.createdAt;
             }
 
-            // Default: manual sorting (by creation date, newest first)
-            return b.createdAt - a.createdAt;
+            // Default: manual sorting (by order)
+            return (a.order || 0) - (b.order || 0);
         });
 
         if (filteredTasks.length === 0) {
@@ -4063,7 +4741,7 @@ class TodoApp {
             }
 
             taskEl.innerHTML = `
-                <div class="drag-handle">
+                <div class="drag-handle" title="Drag to reorder">
                     <i class="fas fa-grip-vertical"></i>
                 </div>
                 ${expandButtonHTML}
@@ -4087,9 +4765,55 @@ class TodoApp {
                 </div>
             `;
 
+            // Detect if drag starts from the handle
+            const dragHandle = taskEl.querySelector('.drag-handle');
+            let isDraggingHandle = false;
+
+            dragHandle.addEventListener('mousedown', () => {
+                isDraggingHandle = true;
+            });
+
+            taskEl.addEventListener('mousedown', (e) => {
+                if (!e.target.closest('.drag-handle')) {
+                    isDraggingHandle = false;
+                }
+            });
+
             // Drag handlers
-            taskEl.addEventListener('dragstart', (e) => this.handleDragStart(e, task.id));
-            taskEl.addEventListener('dragend', (e) => this.handleDragEnd(e));
+            taskEl.addEventListener('dragstart', (e) => {
+                if (isDraggingHandle) {
+                    this.handleTaskDragStart(e, task.id);
+                } else {
+                    this.handleDragStart(e, task.id);
+                }
+            });
+
+            taskEl.addEventListener('dragend', (e) => {
+                if (this.dragMode === 'task-reorder') {
+                    this.handleTaskDragEnd(e);
+                } else {
+                    this.handleDragEnd(e);
+                }
+                isDraggingHandle = false;
+            });
+
+            taskEl.addEventListener('dragover', (e) => {
+                if (this.dragMode === 'task-reorder') {
+                    this.handleTaskDragOver(e, task.id);
+                }
+            });
+
+            taskEl.addEventListener('dragleave', (e) => {
+                if (this.dragMode === 'task-reorder') {
+                    this.handleTaskDragLeave(e);
+                }
+            });
+
+            taskEl.addEventListener('drop', (e) => {
+                if (this.dragMode === 'task-reorder') {
+                    this.handleTaskDrop(e, task.id);
+                }
+            });
 
             taskList.appendChild(taskEl);
 

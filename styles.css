@@ -1387,19 +1387,56 @@ body {
     cursor: grab;
     padding: 4px;
     opacity: 0;
+    transition: opacity 0.2s;
 }
 
-.task-item:hover .drag-handle {
+.task-item:hover .drag-handle,
+.folder-item:hover .drag-handle {
     opacity: 1;
 }
 
-.task-item.dragging {
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.task-item.dragging,
+.folder-item.dragging {
     opacity: 0.5;
 }
 
 .folder-item.drag-over {
     background: var(--hover-bg);
     border: 1px dashed var(--text-tertiary);
+}
+
+/* Reordering indicators */
+.task-item.drag-over-top::before,
+.folder-item.drag-over-top::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent-blue);
+    z-index: 10;
+}
+
+.task-item.drag-over-bottom::after,
+.folder-item.drag-over-bottom::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent-blue);
+    z-index: 10;
+}
+
+.task-item,
+.folder-item {
+    position: relative;
 }
 
 /* SUBFOLDER STYLING */
@@ -2139,4 +2176,12 @@ body.compact-mode .form-textarea {
     background-repeat: no-repeat;
     background-attachment: fixed;
     pointer-events: none;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    -webkit-backface-visibility: hidden;
+    -moz-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-transform: translateZ(0);
+    -moz-transform: translateZ(0);
+    transform: translateZ(0);
 }

@@ -402,7 +402,12 @@
 
                         <div class="settings-group">
                             <label class="settings-label">Email Address</label>
-                            <input type="email" id="settings-email" class="settings-input" readonly>
+                            <div style="display: flex; gap: 8px; align-items: flex-start;">
+                                <input type="email" id="settings-email" class="settings-input" readonly>
+                                <button class="btn btn-secondary" id="change-email-btn">
+                                    <i class="fas fa-edit"></i> Change
+                                </button>
+                            </div>
                             <p class="settings-help">Your email address is used for authentication and email reminders</p>
                         </div>
 
@@ -443,6 +448,13 @@
                                 <i class="fas fa-download"></i> Export All Data
                             </button>
                             <p class="settings-help">Download all your tasks, folders, and sections as JSON</p>
+                        </div>
+
+                        <div class="settings-group">
+                            <button class="btn btn-secondary" id="cleanup-folders-btn">
+                                <i class="fas fa-broom"></i> Clean Up Duplicate Folders
+                            </button>
+                            <p class="settings-help">Remove any duplicate Inbox folders (keeps the oldest one)</p>
                         </div>
                     </div>
 
@@ -550,6 +562,12 @@
 
                         <h4 class="settings-section-title">Backgrounds</h4>
                         <p class="settings-help" style="margin-bottom: 16px;">Choose a background or upload your own image</p>
+                        <div style="background: var(--bg-secondary); padding: 12px; border-radius: 5px; margin-bottom: 16px; border-left: 3px solid var(--accent-blue);">
+                            <p style="font-size: 12px; color: var(--text-primary); margin: 0;">
+                                <i class="fas fa-info-circle" style="color: var(--accent-blue); margin-right: 6px;"></i>
+                                <strong>Recommended image size:</strong> 1920x1080 pixels (16:9 aspect ratio) or higher. Maximum file size: 5MB.
+                            </p>
+                        </div>
 
                         <div class="backgrounds-gallery" id="backgrounds-gallery">
                             <!-- Backgrounds will be dynamically rendered here -->
@@ -724,6 +742,66 @@
             <div class="modal-footer">
                 <button class="btn btn-primary" id="verify-password-submit-btn">Verify & Reset Password</button>
                 <button class="btn btn-secondary" id="verify-password-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Email Modal -->
+    <div class="modal" id="change-email-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Change Email Address</h3>
+                <button class="modal-close" id="change-email-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; color: var(--text-secondary); font-size: 13px;">
+                    Enter your new email address. You'll receive verification codes to both your current and new email addresses.
+                </p>
+                <div class="settings-group">
+                    <label class="settings-label">Current Email</label>
+                    <input type="email" id="change-email-current" class="settings-input" readonly>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">New Email Address</label>
+                    <input type="email" id="change-email-new" class="settings-input" placeholder="Enter new email address">
+                </div>
+                <div id="change-email-error" class="auth-error" style="display: none; margin-top: 12px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="change-email-submit-btn">Send Verification Codes</button>
+                <button class="btn btn-secondary" id="change-email-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verify Email Change Modal -->
+    <div class="modal" id="verify-email-change-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Verify Email Change</h3>
+                <button class="modal-close" id="verify-email-change-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 16px; color: var(--text-secondary); font-size: 13px;">
+                    We've sent verification codes to both your current and new email addresses. Please enter them below to complete the email change.
+                </p>
+                <div class="settings-group">
+                    <label class="settings-label">Code from Current Email (<span id="verify-old-email-display"></span>)</label>
+                    <input type="text" id="verify-old-email-code" class="settings-input" placeholder="Enter 6-digit code" maxlength="6">
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">Code from New Email (<span id="verify-new-email-display"></span>)</label>
+                    <input type="text" id="verify-new-email-code" class="settings-input" placeholder="Enter 6-digit code" maxlength="6">
+                </div>
+                <div id="verify-email-change-error" class="auth-error" style="display: none; margin-top: 12px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="verify-email-change-submit-btn">Verify & Change Email</button>
+                <button class="btn btn-secondary" id="verify-email-change-cancel-btn">Cancel</button>
             </div>
         </div>
     </div>
