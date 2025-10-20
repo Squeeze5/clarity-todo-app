@@ -4295,7 +4295,7 @@ class TodoApp {
 
             const folderEl = document.createElement('div');
             folderEl.className = `folder-item ${folder.id === this.currentFolderId ? 'active' : ''}`;
-            folderEl.draggable = true;
+            folderEl.draggable = false;  // Not draggable by default - allows task drops
 
             // Add subfolder classes for indentation
             if (level > 0) {
@@ -4326,9 +4326,6 @@ class TodoApp {
                 '';
 
             folderEl.innerHTML = `
-                <span class="drag-handle" title="Drag to reorder">
-                    <i class="fas fa-grip-vertical"></i>
-                </span>
                 ${hasChildren ? `<button class="folder-expand-toggle ${this.expandedFolders.has(folder.id) ? 'expanded' : ''}" onclick="todoApp.toggleFolderExpansion('${folder.id}')"><i class="${expandIcon}"></i></button>` : ''}
                 <i class="${icon}"></i>
                 <span>${this.escapeHtml(folder.text)}</span>
@@ -4347,19 +4344,83 @@ class TodoApp {
 
             // Click to switch folders
             folderEl.addEventListener('click', (e) => {
-                if (!e.target.closest('.folder-actions') && !e.target.closest('.folder-expand-toggle') && !e.target.closest('.drag-handle')) {
+                if (!e.target.closest('.folder-actions') && !e.target.closest('.folder-expand-toggle')) {
                     this.switchFolder(folder.id);
                 }
             });
 
-            // Folder reordering drag handlers
-            folderEl.addEventListener('dragstart', (e) => this.handleFolderDragStart(e, folder.id));
-            folderEl.addEventListener('dragend', (e) => this.handleFolderDragEnd(e));
-            folderEl.addEventListener('dragover', (e) => this.handleFolderDragOver(e, folder.id));
-            folderEl.addEventListener('dragleave', (e) => this.handleFolderDragLeave(e));
-            folderEl.addEventListener('drop', (e) => this.handleFolderDrop(e, folder.id));
+            // Enable folder dragging when Shift key is held
+            folderEl.addEventListener('mousedown', (e) => {
+                if (e.shiftKey && !e.target.closest('.folder-actions') && !e.target.closest('.folder-expand-toggle')) {
+                    folderEl.draggable = true;
+                } else {
+                    folderEl.draggable = false;
+                }
+            });
 
-            // Task moving drag handlers (old functionality)
+            folderEl.addEventListener('mouseup', () => {
+                setTimeout(() => {
+                    folderEl.draggable = false;
+                }, 100);
+            });
+
+            // Folder reordering drag handlers
+            folderEl.addEventListener('dragstart', (e) => {
+                this.handleFolderDragStart(e, folder.id);
+            });
+
+            folderEl.addEventListener('dragend', (e) => {
+                this.handleFolderDragEnd(e);
+            });
+
+            // Combined dragover handler for both modes
+            folderEl.addEventListener('dragover', (e) => {
+                // Only allow drops for folder-reorder and task-move modes
+                // Do NOT allow task-reorder (can't reorder tasks across folders)
+                if (this.dragMode === 'folder-reorder') {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+
+                    // Calculate if we're in top or bottom half for folder reordering
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const midpoint = rect.top + rect.height / 2;
+                    const isTopHalf = e.clientY < midpoint;
+
+                    // Remove existing classes
+                    e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+
+                    // Add appropriate class
+                    if (isTopHalf) {
+                        e.currentTarget.classList.add('drag-over-top');
+                    } else {
+                        e.currentTarget.classList.add('drag-over-bottom');
+                    }
+                } else if (this.dragMode === 'task-move') {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                }
+                // If dragMode is 'task-reorder', do NOT preventDefault - show blocked cursor
+            });
+
+            // Combined dragleave handler
+            folderEl.addEventListener('dragleave', (e) => {
+                if (this.dragMode === 'folder-reorder') {
+                    this.handleFolderDragLeave(e);
+                } else if (this.dragMode === 'task-move') {
+                    this.handleDragLeave(e);
+                }
+            });
+
+            // Combined drop handler
+            folderEl.addEventListener('drop', (e) => {
+                if (this.dragMode === 'folder-reorder') {
+                    this.handleFolderDrop(e, folder.id);
+                } else if (this.dragMode === 'task-move') {
+                    this.handleDrop(e, folder.id);
+                }
+            });
+
+            // Task moving drag enter handler (old functionality)
             folderEl.addEventListener('dragenter', (e) => {
                 if (this.dragMode === 'task-move') {
                     this.handleDragEnter(e, folder.id);

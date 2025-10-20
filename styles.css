@@ -1386,13 +1386,15 @@ body {
     color: var(--text-tertiary);
     cursor: grab;
     padding: 4px;
-    opacity: 0;
-    transition: opacity 0.2s;
+    width: 20px;
+    opacity: 1;
+    transition: color 0.2s;
+    flex-shrink: 0;
 }
 
 .task-item:hover .drag-handle,
 .folder-item:hover .drag-handle {
-    opacity: 1;
+    color: var(--text-primary);
 }
 
 .drag-handle:active {
