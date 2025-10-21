@@ -28,6 +28,7 @@ temp/
 # Claude workspace
 .claude/
 CLAUDE.md
+.mcp.json
 
 # OS generated files
 Thumbs.db
