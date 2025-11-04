@@ -29,6 +29,7 @@ npm start
 ```
 http://localhost:3000
 ```
+Or you can open this link (website is hosted on there) https://clarity-todo.com/
 
 ## Technology Stack
 
