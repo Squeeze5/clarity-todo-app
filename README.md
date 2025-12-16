@@ -64,25 +64,6 @@ clarity-todo-app/
 6. **Search**: Use the search bar to find tasks
 7. **Sign Out**: Click sign out button when done
 
-## Deployment
-
-### Deploy to Netlify:
-1. Push code to GitHub
-2. Connect repository to Netlify
-3. Build command: `npm run build`
-4. Publish directory: `/`
-
-### Deploy to Vercel:
-1. Push code to GitHub
-2. Import repository in Vercel
-3. Build command: `npm run build`
-4. Output directory: `/`
-
-## Environment Variables
-
-The app uses InstantDB with the app ID hardcoded in `script-instantdb.js`. 
-For production, consider using environment variables.
-
 ## Browser Support
 
 - Chrome (latest)
