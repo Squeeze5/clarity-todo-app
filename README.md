@@ -73,4 +73,4 @@ clarity-todo-app/
 
 ## License
 
-MIT
+GNU Public Licence
