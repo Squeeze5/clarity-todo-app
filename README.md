@@ -15,21 +15,9 @@ A modern, elegant todo list application with folder organization, task managemen
 
 ## Quick Start
 
-1. **Install dependencies:**
-```bash
-npm install
-```
-
-2. **Start the development server:**
-```bash
-npm start
-```
-
-3. **Open in browser:**
-```
-http://localhost:3000
-```
-Or you can open this link (website is hosted on there) https://clarity-todo.com/
+1. Go to the website: https://clarity-todo.com/
+2. Sign up
+3. Start exploring!
 
 ## Technology Stack
 
